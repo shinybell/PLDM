@@ -6,7 +6,7 @@ warnings.filterwarnings("ignore", message="Ill-formed record")
 from typing import Optional
 import os
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import dataclasses
 import random
 import time
@@ -71,9 +71,9 @@ class TrainConfig(ConfigBase):
     optimizer_type: OptimizerType = OptimizerType.LARS
     optimizer_schedule: LRSchedule = LRSchedule.Cosine
 
-    data: DataConfig = DataConfig()
+    data: DataConfig = field(default_factory=DataConfig)
 
-    objectives_l1: ObjectivesConfig = ObjectivesConfig()
+    objectives_l1: ObjectivesConfig = field(default_factory=ObjectivesConfig)
 
     eval_at_beginning: bool = False
     eval_during_training: bool = False
@@ -81,12 +81,12 @@ class TrainConfig(ConfigBase):
     save_every_n_epochs: int = 5
     eval_every_n_epochs: int = 20
 
-    hjepa: HJEPAConfig = HJEPAConfig()
+    hjepa: HJEPAConfig = field(default_factory=HJEPAConfig)
 
     resume_if_possible: bool = True
     compile_model: bool = True
 
-    eval_cfg: EvalConfig = EvalConfig()
+    eval_cfg: EvalConfig = field(default_factory=EvalConfig)
 
     def __post_init__(self):
         if self.quick_debug:

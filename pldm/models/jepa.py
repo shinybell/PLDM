@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, NamedTuple
+from dataclasses import field
 
 import torch
 
@@ -14,8 +15,9 @@ from pldm.models.predictors import build_predictor
 
 @dataclass
 class JEPAConfig(ConfigBase):
-    backbone: BackboneConfig = BackboneConfig()
-    predictor: PredictorConfig = PredictorConfig()
+    # field(default_factory=...) を使用して、ミュータブルなデフォルト値を回避
+    backbone: BackboneConfig = field(default_factory=BackboneConfig)
+    predictor: PredictorConfig = field(default_factory=PredictorConfig)
 
     action_dim: int = 2
 
