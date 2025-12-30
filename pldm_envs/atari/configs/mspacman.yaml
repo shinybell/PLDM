@@ -1,0 +1,98 @@
+# Atari MsPacman環境の設定ファイル
+
+env_name: mspacman
+
+# データ設定
+data:
+  dataset_type: Atari
+  normalize: true
+  min_max_normalize_state: false
+  num_workers: 4
+
+  atari_config:
+    env_name: "MsPacman-v5"
+    batch_size: 32
+    sample_length: 17
+    train: true
+
+    # データソース（要変更: 実際のデータパスを指定）
+    online_mode: false
+    data_path: /path/to/mspacman_train.npz
+    val_path: /path/to/mspacman_val.npz
+
+    # 画像設定
+    img_size: 64
+    grayscale: false  # RGB画像を使用
+    frame_stack: 4    # DQNスタイルのフレームスタック
+    frame_skip: 4
+
+    # Gymnasium設定
+    obs_type: "rgb"
+    repeat_action_probability: 0.0
+    full_action_space: false
+
+    # 前処理
+    normalize_images: true
+    include_rewards: false
+    include_dones: false
+
+    # デバッグ
+    quick_debug: false
+    crop_length: null
+    seed: 42
+
+# モデル設定
+hjepa:
+  level1:
+    backbone:
+      arch: resnet18  # Atariにはresnet18が適している
+    action_dim: 9  # MsPacman-v5のアクション数
+  disable_l2: true
+
+# 目的関数設定
+objectives_l1:
+  objectives:
+    - VICReg  # 表現学習
+    - IDM     # Inverse Dynamics Model（アクション予測）
+
+  vicreg:
+    enabled: true
+    lambda_inv: 25.0
+    lambda_var: 25.0
+    lambda_cov: 1.0
+
+  idm:
+    enabled: true
+    action_dim: 9
+
+# 訓練設定
+n_steps: 17
+val_n_steps: 17
+epochs: 100
+base_lr: 0.0001  # Atariには小さめのLRが適している
+optimizer_type: Adam  # AdamがAtariには一般的
+optimizer_schedule: Cosine
+
+save_every_n_epochs: 10
+eval_every_n_epochs: 20
+
+# 出力設定
+output_root: ./outputs
+output_dir: atari_mspacman
+
+# WandB設定
+wandb: true
+run_name: atari_mspacman_vicreg
+run_project: PLDM-Atari
+
+# 評価設定
+eval_cfg:
+  env_name: mspacman
+  eval_l1: true
+  eval_l2: false
+  disable_planning: true  # 初期実装ではプランニング評価を無効化
+
+  probing:
+    probe_preds: true
+    probe_encoder: true
+    l1_depth: 17

@@ -15,6 +15,9 @@ from pldm.data.utils import make_dataloader, make_dataloader_for_prebatched_ds
 # if "AMD" not in torch.cuda.get_device_name(0):
 from pldm_envs.diverse_maze.d4rl import D4RLDataset
 
+# Atari dataset
+from pldm_envs.atari.data.atari_dataset import AtariDataset
+
 from pldm.probing.evaluator import ProbingConfig
 from pldm_envs.utils.normalizer import Normalizer
 from pldm.data.enums import DataConfig, DatasetType, ProbingDatasets, Datasets
@@ -42,6 +45,8 @@ class DatasetFactory:
             return self._create_d4rl_datasets()
         elif self.config.dataset_type == DatasetType.LocoMaze:
             return self._create_locomaze_datasets()
+        elif self.config.dataset_type == DatasetType.Atari:
+            return self._create_atari_datasets()
         else:
             raise NotImplementedError
 
@@ -206,6 +211,46 @@ class DatasetFactory:
             ds=ds,
             val_ds=None,
             probing_datasets=ProbingDatasets(ds=probe_ds, val_ds=probe_val_ds),
+        )
+
+        return datasets
+
+    def _create_atari_datasets(self):
+        """
+        Atariデータセットを作成
+
+        Returns:
+            Datasets: 訓練データセット、検証データセット（オプション）
+        """
+        # 訓練データセット
+        ds = AtariDataset(self.config.atari_config)
+        ds = make_dataloader(
+            ds=ds,
+            loader_config=self.config,
+            suffix="atari_train"
+        )
+
+        # 検証データセット（オプション）
+        val_ds = None
+        if self.config.atari_config.val_path is not None:
+            val_ds = AtariDataset(
+                dataclasses.replace(
+                    self.config.atari_config,
+                    data_path=self.config.atari_config.val_path,
+                    train=False,
+                )
+            )
+            val_ds = make_dataloader(
+                ds=val_ds,
+                loader_config=self.config,
+                normalizer=ds.normalizer,
+                suffix="atari_val",
+                train=False,
+            )
+
+        datasets = Datasets(
+            ds=ds,
+            val_ds=val_ds,
         )
 
         return datasets

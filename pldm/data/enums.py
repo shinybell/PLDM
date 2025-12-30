@@ -9,6 +9,7 @@ from pldm_envs.wall.data.single import DotDatasetConfig
 from pldm_envs.wall.data.wall_expert import WallExpertDatasetConfig
 
 from pldm_envs.diverse_maze.enums import D4RLDatasetConfig
+from pldm_envs.atari.enums import AtariDatasetConfig
 
 
 class DatasetType(Enum):
@@ -19,6 +20,7 @@ class DatasetType(Enum):
     D4RL = auto()
     D4RLEigf = auto()
     LocoMaze = auto()
+    Atari = auto()
 
 
 class ProbingDatasets(NamedTuple):
@@ -46,6 +48,9 @@ class DataConfig(ConfigBase):
     # if "AMD" not in torch.cuda.get_device_name(0):
     # D4RLDatasetConfig も同様に修正
     d4rl_config: D4RLDatasetConfig = field(default_factory=D4RLDatasetConfig)
+
+    # Atari設定
+    atari_config: AtariDatasetConfig = field(default_factory=AtariDatasetConfig)
 
     normalize: bool = False
     min_max_normalize_state: bool = False
