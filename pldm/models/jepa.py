@@ -179,7 +179,7 @@ class JEPA(torch.nn.Module):
         actions:
             (T-1)xBxA
         """
-        if input_states.shape[-1] != self.repr_dim:
+        if input_states.shape[-1] != self.repr_dim:  # 入力が観測画像の場合
             if self.config.backbone.propio_dim is not None:
                 if propio_pos.numel() == 0:
                     propio_states = propio_vel
@@ -196,7 +196,7 @@ class JEPA(torch.nn.Module):
                 backbone_output = self.backbone.forward_multiple(input_states)
 
             state_encs = backbone_output.encodings
-        else:
+        else:  # 入力がすでにエンコードされた表現の場合 HJEPAのL2以降
             state_encs = input_states  # might be problematic for l2
 
         if self.config.momentum > 0:

@@ -84,10 +84,10 @@ class IDMObjective(torch.nn.Module):
 
         encodings = result.backbone_output.encodings
 
-        if self.config.use_pred:
+        if self.config.use_pred:  # 予測された潜在表現を使う場合
             curr_embeds = result.pred_output.predictions[:-1]
             next_embeds = encodings[1:]
-        else:
+        else:  # 通常の場合
             curr_embeds = encodings[:-1]
             next_embeds = encodings[1:]
 
