@@ -25,6 +25,9 @@ import argparse
 from tqdm import tqdm
 from pathlib import Path
 import gymnasium as gym
+import ale_py
+
+gym.register_envs(ale_py)
 
 
 def generate_episode(env, policy, max_steps=10000, seed=None):
@@ -65,17 +68,19 @@ def generate_episode(env, policy, max_steps=10000, seed=None):
             break
 
     return {
-        'observations': np.array(obs_list),
-        'actions': np.array(action_list),
-        'rewards': np.array(reward_list),
-        'dones': np.array(done_list),
+        "observations": np.array(obs_list),
+        "actions": np.array(action_list),
+        "rewards": np.array(reward_list),
+        "dones": np.array(done_list),
     }
 
 
 def create_random_policy(env):
     """ランダムポリシーを作成"""
+
     def policy(obs):
         return env.action_space.sample()
+
     return policy
 
 
@@ -90,75 +95,99 @@ def pad_episode(episode, target_length):
     Returns:
         パディングされたエピソード
     """
-    current_length = len(episode['observations'])
+    current_length = len(episode["observations"])
 
     if current_length >= target_length:
         # 切り詰め
         return {
-            'observations': episode['observations'][:target_length],
-            'actions': episode['actions'][:target_length-1],
-            'rewards': episode['rewards'][:target_length-1],
-            'dones': episode['dones'][:target_length-1],
+            "observations": episode["observations"][:target_length],
+            "actions": episode["actions"][: target_length - 1],
+            "rewards": episode["rewards"][: target_length - 1],
+            "dones": episode["dones"][: target_length - 1],
         }
     else:
         # パディング
         pad_length = target_length - current_length
 
         # 最後のフレームを繰り返してパディング
-        last_obs = episode['observations'][-1]
-        padded_obs = np.concatenate([
-            episode['observations'],
-            np.repeat(last_obs[np.newaxis], pad_length, axis=0)
-        ], axis=0)
+        last_obs = episode["observations"][-1]
+        padded_obs = np.concatenate(
+            [
+                episode["observations"],
+                np.repeat(last_obs[np.newaxis], pad_length, axis=0),
+            ],
+            axis=0,
+        )
 
         # アクション、報酬、doneは0でパディング
-        padded_actions = np.concatenate([
-            episode['actions'],
-            np.zeros(pad_length, dtype=episode['actions'].dtype)
-        ], axis=0)
+        padded_actions = np.concatenate(
+            [episode["actions"], np.zeros(pad_length, dtype=episode["actions"].dtype)],
+            axis=0,
+        )
 
-        padded_rewards = np.concatenate([
-            episode['rewards'],
-            np.zeros(pad_length, dtype=episode['rewards'].dtype)
-        ], axis=0)
+        padded_rewards = np.concatenate(
+            [episode["rewards"], np.zeros(pad_length, dtype=episode["rewards"].dtype)],
+            axis=0,
+        )
 
-        padded_dones = np.concatenate([
-            episode['dones'],
-            np.ones(pad_length, dtype=bool)  # パディング部分は終了扱い
-        ], axis=0)
+        padded_dones = np.concatenate(
+            [
+                episode["dones"],
+                np.ones(pad_length, dtype=bool),  # パディング部分は終了扱い
+            ],
+            axis=0,
+        )
 
         return {
-            'observations': padded_obs,
-            'actions': padded_actions,
-            'rewards': padded_rewards,
-            'dones': padded_dones,
+            "observations": padded_obs,
+            "actions": padded_actions,
+            "rewards": padded_rewards,
+            "dones": padded_dones,
         }
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Atariデータ生成')
-    parser.add_argument('--env_name', type=str, default='ALE/Pacman-v5',
-                        help='Atari環境名')
-    parser.add_argument('--n_episodes', type=int, default=1000,
-                        help='生成するエピソード数')
-    parser.add_argument('--output_path', type=str, required=True,
-                        help='出力ファイルパス (.npz)')
-    parser.add_argument('--policy_type', type=str, default='random',
-                        choices=['random'],
-                        help='ポリシータイプ')
-    parser.add_argument('--max_episode_steps', type=int, default=10000,
-                        help='エピソードの最大ステップ数')
-    parser.add_argument('--seed', type=int, default=42,
-                        help='ランダムシード')
-    parser.add_argument('--obs_type', type=str, default='rgb',
-                        choices=['rgb', 'grayscale'],
-                        help='観測タイプ')
-    parser.add_argument('--frameskip', type=int, default=4,
-                        help='フレームスキップ')
-    parser.add_argument('--pad_length', type=int, default=None,
-                        help='エピソードをパディングする長さ（指定しない場合は可変長）')
-    parser.add_argument('--render', action='store_true',
-                        help='レンダリングを有効化（デバッグ用）')
+    parser = argparse.ArgumentParser(description="Atariデータ生成")
+    parser.add_argument(
+        "--env_name", type=str, default="ALE/Pacman-v5", help="Atari環境名"
+    )
+    parser.add_argument(
+        "--n_episodes", type=int, default=1000, help="生成するエピソード数"
+    )
+    parser.add_argument(
+        "--output_path", type=str, required=True, help="出力ファイルパス (.npz)"
+    )
+    parser.add_argument(
+        "--policy_type",
+        type=str,
+        default="random",
+        choices=["random"],
+        help="ポリシータイプ",
+    )
+    parser.add_argument(
+        "--max_episode_steps",
+        type=int,
+        default=10000,
+        help="エピソードの最大ステップ数",
+    )
+    parser.add_argument("--seed", type=int, default=42, help="ランダムシード")
+    parser.add_argument(
+        "--obs_type",
+        type=str,
+        default="rgb",
+        choices=["rgb", "grayscale"],
+        help="観測タイプ",
+    )
+    parser.add_argument("--frameskip", type=int, default=4, help="フレームスキップ")
+    parser.add_argument(
+        "--pad_length",
+        type=int,
+        default=None,
+        help="エピソードをパディングする長さ（指定しない場合は可変長）",
+    )
+    parser.add_argument(
+        "--render", action="store_true", help="レンダリングを有効化（デバッグ用）"
+    )
 
     args = parser.parse_args()
 
@@ -182,7 +211,7 @@ def main():
         args.env_name,
         obs_type=args.obs_type,
         frameskip=args.frameskip,
-        render_mode='human' if args.render else None,
+        render_mode="human" if args.render else None,
     )
 
     print(f"\nEnvironment created:")
@@ -190,7 +219,7 @@ def main():
     print(f"  Action space: {env.action_space}")
 
     # ポリシーの作成
-    if args.policy_type == 'random':
+    if args.policy_type == "random":
         policy = create_random_policy(env)
     else:
         raise ValueError(f"Unknown policy type: {args.policy_type}")
@@ -203,13 +232,10 @@ def main():
 
     for ep_idx in tqdm(range(args.n_episodes), desc="Episodes"):
         episode = generate_episode(
-            env,
-            policy,
-            max_steps=args.max_episode_steps,
-            seed=args.seed + ep_idx
+            env, policy, max_steps=args.max_episode_steps, seed=args.seed + ep_idx
         )
 
-        episode_lengths.append(len(episode['observations']))
+        episode_lengths.append(len(episode["observations"]))
 
         # パディング（必要な場合）
         if args.pad_length is not None:
@@ -233,16 +259,18 @@ def main():
     # データを配列に変換
     if args.pad_length is not None:
         # パディング済み: 固定長配列
-        observations = np.array([ep['observations'] for ep in all_episodes])
-        actions = np.array([ep['actions'] for ep in all_episodes])
-        rewards = np.array([ep['rewards'] for ep in all_episodes])
-        dones = np.array([ep['dones'] for ep in all_episodes])
+        observations = np.array([ep["observations"] for ep in all_episodes])
+        actions = np.array([ep["actions"] for ep in all_episodes])
+        rewards = np.array([ep["rewards"] for ep in all_episodes])
+        dones = np.array([ep["dones"] for ep in all_episodes])
     else:
         # 可変長: object配列
-        observations = np.array([ep['observations'] for ep in all_episodes], dtype=object)
-        actions = np.array([ep['actions'] for ep in all_episodes], dtype=object)
-        rewards = np.array([ep['rewards'] for ep in all_episodes], dtype=object)
-        dones = np.array([ep['dones'] for ep in all_episodes], dtype=object)
+        observations = np.array(
+            [ep["observations"] for ep in all_episodes], dtype=object
+        )
+        actions = np.array([ep["actions"] for ep in all_episodes], dtype=object)
+        rewards = np.array([ep["rewards"] for ep in all_episodes], dtype=object)
+        dones = np.array([ep["dones"] for ep in all_episodes], dtype=object)
 
     # 保存
     print(f"\nSaving data to {args.output_path}...")
@@ -275,5 +303,5 @@ def main():
     print("=" * 60)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
