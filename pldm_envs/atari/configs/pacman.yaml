@@ -1,6 +1,6 @@
-# Atari MsPacman環境の設定ファイル
+# Atari Pacman環境の設定ファイル
 
-env_name: mspacman
+env_name: pacman
 
 # データ設定
 data:
@@ -10,15 +10,15 @@ data:
   num_workers: 4
 
   atari_config:
-    env_name: "ALE/MsPacman-v5"
+    env_name: "ALE/Pacman-v5"
     batch_size: 32
     sample_length: 17
     train: true
 
     # データソース（要変更: 実際のデータパスを指定）
     online_mode: false
-    data_path: /path/to/mspacman_train.npz
-    val_path: /path/to/mspacman_val.npz
+    data_path: /path/to/pacman_train.npz
+    val_path: /path/to/pacman_val.npz
 
     # 画像設定
     img_size: 64
@@ -46,7 +46,7 @@ hjepa:
   level1:
     backbone:
       arch: resnet18  # Atariにはresnet18が適している
-    action_dim: 9  # MsPacman-v5のアクション数
+    action_dim: 5  # Pacman-v5のアクション数（MsPacmanは9）
   disable_l2: true
 
 # 目的関数設定
@@ -63,7 +63,7 @@ objectives_l1:
 
   idm:
     enabled: true
-    action_dim: 9
+    action_dim: 5  # Pacmanのアクション数
 
 # 訓練設定
 n_steps: 17
@@ -78,16 +78,16 @@ eval_every_n_epochs: 20
 
 # 出力設定
 output_root: ./outputs
-output_dir: atari_mspacman
+output_dir: atari_pacman
 
 # WandB設定
 wandb: true
-run_name: atari_mspacman_vicreg
+run_name: atari_pacman_vicreg
 run_project: PLDM-Atari
 
 # 評価設定
 eval_cfg:
-  env_name: mspacman
+  env_name: pacman
   eval_l1: true
   eval_l2: false
   disable_planning: true  # 初期実装ではプランニング評価を無効化

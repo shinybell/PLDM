@@ -58,7 +58,7 @@ def test_dataset_with_dummy_data():
 
     # データセット設定
     config = AtariDatasetConfig(
-        env_name="MsPacman-v5",
+        env_name="ALE/MsPacman-v5",
         data_path=str(dummy_path),
         batch_size=4,
         sample_length=17,
@@ -166,7 +166,7 @@ def test_dataset_with_real_data(data_path: str):
     print("=" * 60)
 
     config = AtariDatasetConfig(
-        env_name="MsPacman-v5",
+        env_name="ALE/MsPacman-v5",
         data_path=data_path,
         batch_size=32,
         sample_length=17,

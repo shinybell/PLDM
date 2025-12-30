@@ -137,7 +137,7 @@ def pad_episode(episode, target_length):
 
 def main():
     parser = argparse.ArgumentParser(description='Atariデータ生成')
-    parser.add_argument('--env_name', type=str, default='MsPacman-v5',
+    parser.add_argument('--env_name', type=str, default='ALE/Pacman-v5',
                         help='Atari環境名')
     parser.add_argument('--n_episodes', type=int, default=1000,
                         help='生成するエピソード数')

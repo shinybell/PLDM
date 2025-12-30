@@ -41,14 +41,14 @@ pip install opencv-python
 ```bash
 # デバッグ用（10エピソード）
 python pldm_envs/atari/data_generation/generate_data.py \
-  --env_name MsPacman-v5 \
+  --env_name ALE/MsPacman-v5 \
   --n_episodes 10 \
   --output_path data/atari/mspacman_debug.npz \
   --pad_length 100
 
 # 訓練用（1000エピソード）
 python pldm_envs/atari/data_generation/generate_data.py \
-  --env_name MsPacman-v5 \
+  --env_name ALE/MsPacman-v5 \
   --n_episodes 1000 \
   --output_path data/atari/mspacman_train.npz \
   --pad_length 1000 \
@@ -56,7 +56,7 @@ python pldm_envs/atari/data_generation/generate_data.py \
 
 # 検証用（200エピソード）
 python pldm_envs/atari/data_generation/generate_data.py \
-  --env_name MsPacman-v5 \
+  --env_name ALE/MsPacman-v5 \
   --n_episodes 200 \
   --output_path data/atari/mspacman_val.npz \
   --pad_length 1000 \
@@ -190,21 +190,21 @@ MsPacman以外のゲームも同様に使用できます:
 # Pong
 data:
   atari_config:
-    env_name: "Pong-v5"
+    env_name: "ALE/Pong-v5"
     # ... other settings ...
 
 # Breakout
 data:
   atari_config:
-    env_name: "Breakout-v5"
+    env_name: "ALE/Breakout-v5"
     # ... other settings ...
 ```
 
-利用可能な環境:
-- `MsPacman-v5` (9 actions)
-- `Pong-v5` (6 actions)
-- `Breakout-v5` (4 actions)
-- `SpaceInvaders-v5` (6 actions)
+利用可能な環境（Gymnasium v5形式）:
+- `ALE/MsPacman-v5` (9 actions)
+- `ALE/Pong-v5` (6 actions)
+- `ALE/Breakout-v5` (4 actions)
+- `ALE/SpaceInvaders-v5` (6 actions)
 - その他、[Gymnasium Atari環境一覧](https://gymnasium.farama.org/environments/atari/)を参照
 
 **注意**: アクション数が異なる場合は、設定ファイルの `hjepa.level1.action_dim` を変更してください。

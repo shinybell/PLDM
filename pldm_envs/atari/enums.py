@@ -54,7 +54,7 @@ class AtariDatasetConfig:
         full_action_space: 全18アクションを使うか
     """
     # 環境設定
-    env_name: str = "MsPacman-v5"
+    env_name: str = "ALE/Pacman-v5"
     batch_size: int = 32
     sample_length: int = 17  # タイムステップ数
     train: bool = True
