@@ -183,6 +183,35 @@ def test_dataset_with_real_data(data_path: str):
     print(f"  States: {sample.states.shape}")
     print(f"  Actions: {sample.actions.shape}")
 
+    # 可視化
+    print("\n" + "-" * 60)
+    print("Visualizing first 5 frames...")
+    print("-" * 60)
+
+    fig, axes = plt.subplots(1, 5, figsize=(15, 3))
+    for i, ax in enumerate(axes):
+        if i < sample.states.shape[0]:
+            # [C, H, W] -> [H, W, C]
+            img = sample.states[i].permute(1, 2, 0).numpy()
+
+            # グレースケールの場合
+            if img.shape[2] == 1:
+                img = img[:, :, 0]
+                ax.imshow(img, cmap='gray')
+            else:
+                ax.imshow(img)
+
+            ax.set_title(f"t={i}")
+            ax.axis('off')
+
+    output_path = project_root / "test_atari_visualization.png"
+    plt.savefig(output_path)
+    print(f"\nSaved visualization to: {output_path}")
+
+    print("\n" + "=" * 60)
+    print("Test completed!")
+    print("=" * 60)
+
 
 if __name__ == "__main__":
     import argparse
