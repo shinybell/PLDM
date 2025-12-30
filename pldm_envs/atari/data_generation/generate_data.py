@@ -29,6 +29,14 @@ import ale_py
 
 gym.register_envs(ale_py)
 
+try:
+    import cv2
+    HAS_CV2 = True
+except ImportError:
+    HAS_CV2 = False
+    import warnings
+    warnings.warn("opencv-python not found. Resizing will use a slower fallback method.")
+
 
 def generate_episode(env, policy, max_steps=10000, seed=None):
     """
@@ -82,6 +90,50 @@ def create_random_policy(env):
         return env.action_space.sample()
 
     return policy
+
+
+def resize_observations(observations, target_size):
+    """
+    観測画像をリサイズ
+
+    Args:
+        observations: [T, H, W, C] の観測画像
+        target_size: リサイズ後のサイズ (int)
+
+    Returns:
+        リサイズされた観測画像 [T, target_size, target_size, C]
+    """
+    if HAS_CV2:
+        # OpenCVを使用（高速）
+        resized = []
+        for obs in observations:
+            resized_obs = cv2.resize(obs, (target_size, target_size), interpolation=cv2.INTER_AREA)
+            # グレースケールの場合は次元を追加
+            if len(resized_obs.shape) == 2:
+                resized_obs = resized_obs[:, :, np.newaxis]
+            resized.append(resized_obs)
+        return np.array(resized)
+    else:
+        # NumPyのみを使用（遅い）
+        import warnings
+        warnings.warn("Using slow fallback for resizing. Install opencv-python for better performance.")
+
+        T, H, W, C = observations.shape
+        resized = np.zeros((T, target_size, target_size, C), dtype=observations.dtype)
+
+        for t in range(T):
+            for c in range(C):
+                # 簡易的なリサイズ（最近傍補間）
+                y_ratio = H / target_size
+                x_ratio = W / target_size
+
+                for i in range(target_size):
+                    for j in range(target_size):
+                        src_y = int(i * y_ratio)
+                        src_x = int(j * x_ratio)
+                        resized[t, i, j, c] = observations[t, src_y, src_x, c]
+
+        return resized
 
 
 def pad_episode(episode, target_length):
@@ -188,6 +240,12 @@ def main():
     parser.add_argument(
         "--render", action="store_true", help="レンダリングを有効化（デバッグ用）"
     )
+    parser.add_argument(
+        "--resize",
+        type=int,
+        default=None,
+        help="観測画像のリサイズサイズ（指定しない場合は元のサイズ、例: 64, 84）",
+    )
 
     args = parser.parse_args()
 
@@ -204,6 +262,10 @@ def main():
     print(f"Policy: {args.policy_type}")
     print(f"Obs type: {args.obs_type}")
     print(f"Frameskip: {args.frameskip}")
+    if args.resize is not None:
+        print(f"Resize: {args.resize}x{args.resize}")
+    else:
+        print("Resize: None (original size)")
     print("=" * 60)
 
     # 環境の作成
@@ -236,6 +298,12 @@ def main():
         )
 
         episode_lengths.append(len(episode["observations"]))
+
+        # リサイズ（必要な場合）
+        if args.resize is not None:
+            episode["observations"] = resize_observations(
+                episode["observations"], args.resize
+            )
 
         # パディング（必要な場合）
         if args.pad_length is not None:
