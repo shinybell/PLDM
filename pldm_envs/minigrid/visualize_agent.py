@@ -42,7 +42,16 @@ def load_model(checkpoint_path: str, config_path: str = None):
     elif 'config' in checkpoint:
         # チェックポイントに設定が含まれている場合
         config = checkpoint['config']
-        model = HJEPA(config.hjepa)
+
+        # 入力次元を設定から取得
+        if hasattr(config, 'data') and hasattr(config.data, 'minigrid_config'):
+            img_size = config.data.minigrid_config.img_size
+        else:
+            img_size = 72  # デフォルト値
+        channels = 3  # RGB
+        input_dim = (channels, img_size, img_size)
+
+        model = HJEPA(config.hjepa, input_dim=input_dim)
 
         if 'model_state_dict' in checkpoint:
             model.load_state_dict(checkpoint['model_state_dict'])
@@ -75,7 +84,12 @@ def load_model(checkpoint_path: str, config_path: str = None):
 
     config = SimpleConfig(config_dict.hjepa)
 
-    model = HJEPA(config.hjepa)
+    # 入力次元を設定から取得
+    img_size = config_dict.data.minigrid_config.img_size  # 72
+    channels = 3  # RGB
+    input_dim = (channels, img_size, img_size)
+
+    model = HJEPA(config.hjepa, input_dim=input_dim)
 
     if 'model_state_dict' in checkpoint:
         model.load_state_dict(checkpoint['model_state_dict'])
