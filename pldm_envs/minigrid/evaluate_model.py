@@ -18,7 +18,8 @@ import gymnasium as gym
 
 from pldm.models.hjepa import HJEPA
 from pldm.train import TrainConfig
-from pldm_envs.minigrid.wrappers import RGBImgObservationWrapper, ResizeObservationWrapper
+from minigrid.wrappers import RGBImgObsWrapper
+from pldm_envs.minigrid.wrappers import ResizeObservationWrapper
 
 
 def load_model(checkpoint_path: str, config_path: str = None):
@@ -165,7 +166,7 @@ def evaluate_episodes(
 
     # 環境を作成
     env = gym.make(env_name, render_mode='rgb_array' if render else None)
-    env = RGBImgObservationWrapper(env)
+    env = RGBImgObsWrapper(env)
     if obs_size != 64:
         env = ResizeObservationWrapper(env, size=obs_size)
 

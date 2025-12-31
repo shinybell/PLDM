@@ -28,7 +28,8 @@ import imageio
 
 from pldm.models.hjepa import HJEPA
 from pldm.train import TrainConfig
-from pldm_envs.minigrid.wrappers import RGBImgObservationWrapper, ResizeObservationWrapper
+from minigrid.wrappers import RGBImgObsWrapper
+from pldm_envs.minigrid.wrappers import ResizeObservationWrapper
 
 
 def load_model(checkpoint_path: str, config_path: str = None):
@@ -287,7 +288,7 @@ def main():
 
     # 環境を作成
     env = gym.make(args.env_name, render_mode='rgb_array')
-    env = RGBImgObservationWrapper(env)
+    env = RGBImgObsWrapper(env)
     if args.obs_size != 64:
         env = ResizeObservationWrapper(env, size=args.obs_size)
 
