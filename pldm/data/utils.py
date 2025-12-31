@@ -103,7 +103,7 @@ class NormalizedDataLoader:
             yield new_batch
 
 
-def make_dataloader(ds, loader_config, normalizer=None, suffix="", train=True):
+def make_dataloader(ds, loader_config, normalizer=None, suffix="", train=True, collate_fn=None):
     config = ds.config
 
     print(f"{len(ds)} samples in {suffix} dataset")
@@ -120,6 +120,7 @@ def make_dataloader(ds, loader_config, normalizer=None, suffix="", train=True):
             else None
         ),
         pin_memory=False,
+        collate_fn=collate_fn,  # カスタムcollate関数をサポート
     )
     loader.config = config
 

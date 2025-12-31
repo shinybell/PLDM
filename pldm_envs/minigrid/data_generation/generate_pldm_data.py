@@ -1,25 +1,30 @@
+#!/usr/bin/env python3
 """
-MiniGrid環境のデータ生成スクリプト
+MiniGrid LongHorizon環境用のPLDMデータ生成スクリプト
 
-Gymnasiumを使ってMiniGrid環境からデータを収集します。
+PLDMWrapperを使用して、64x64または72x72のRGB観測データを生成します。
 
-使用方法:
-    # ランダムポリシーでデータ生成 (Empty-8x8, 200ステップ)
-    python pldm_envs/minigrid/data_generation/generate_data.py \\
-        --env_name MiniGrid-Empty-8x8-v0 \\
+使用例:
+    # Level 1で1000エピソード生成（64x64）
+    python pldm_envs/minigrid/data_generation/generate_pldm_data.py \\
+        --env_name MiniGrid-LongHorizon-Level1-v0 \\
         --n_episodes 1000 \\
-        --max_steps 200 \\
-        --output_path data/minigrid/empty_8x8_train.npz
+        --output_path data/minigrid/level1_train.npz
 
-    # デバッグ用（少量データ）
-    python pldm_envs/minigrid/data_generation/generate_data.py \\
-        --env_name MiniGrid-Empty-8x8-v0 \\
-        --n_episodes 10 \\
-        --max_steps 200 \\
-        --output_path data/minigrid/empty_8x8_debug.npz
+    # Level 2で1000エピソード生成（72x72）
+    python pldm_envs/minigrid/data_generation/generate_pldm_data.py \\
+        --env_name MiniGrid-LongHorizon-Level2-v0 \\
+        --n_episodes 1000 \\
+        --obs_size 72 \\
+        --output_path data/minigrid/level2_train_72x72.npz
 
-インストール要件:
-    pip install minigrid
+    # PyTorch形式（CHW, normalized）
+    python pldm_envs/minigrid/data_generation/generate_pldm_data.py \\
+        --env_name MiniGrid-LongHorizon-Level1-v0 \\
+        --n_episodes 1000 \\
+        --channel_first \\
+        --normalize \\
+        --output_path data/minigrid/level1_train_pytorch.npz
 """
 
 import numpy as np
@@ -27,39 +32,25 @@ import argparse
 from tqdm import tqdm
 from pathlib import Path
 import gymnasium as gym
-import minigrid
-from minigrid.wrappers import RGBImgObsWrapper, ImgObsWrapper
 
-gym.register_envs(minigrid)
-
-# Register custom long-horizon environments
+# Register MiniGrid environments
 import pldm_envs.minigrid
-try:
-    import cv2
-
-    HAS_CV2 = True
-except ImportError:
-    HAS_CV2 = False
-    import warnings
-
-    warnings.warn(
-        "opencv-python not found. Resizing will use a slower fallback method."
-    )
+from pldm_envs.minigrid.wrappers import make_pldm_env
 
 
-def generate_episode(env, policy, max_steps=1000, seed=None):
+def generate_episode(env, policy, max_steps=None, seed=None):
     """
     1エピソードのデータを生成
 
     Args:
-        env: Gymnasium環境
+        env: PLDM Wrapper適用済みのGymnasium環境
         policy: ポリシー関数 (obs -> action)
-        max_steps: 最大ステップ数
+        max_steps: 最大ステップ数（Noneの場合は環境のデフォルト）
         seed: ランダムシード
 
     Returns:
         dict: エピソードデータ
-            - observations: [T, H, W, C]
+            - observations: [T, H, W, C] or [T, C, H, W]
             - actions: [T-1]
             - rewards: [T-1]
             - dones: [T-1]
@@ -72,7 +63,10 @@ def generate_episode(env, policy, max_steps=1000, seed=None):
     obs, info = env.reset(seed=seed)
     obs_list.append(obs)
 
-    for step in range(max_steps):
+    # 環境のmax_stepsを取得
+    env_max_steps = max_steps or getattr(env.unwrapped, 'max_steps', 256)
+
+    for step in range(env_max_steps):
         action = policy(obs)
         obs, reward, terminated, truncated, info = env.step(action)
 
@@ -94,60 +88,9 @@ def generate_episode(env, policy, max_steps=1000, seed=None):
 
 def create_random_policy(env):
     """ランダムポリシーを作成"""
-
     def policy(obs):
         return env.action_space.sample()
-
     return policy
-
-
-def resize_observations(observations, target_size):
-    """
-    観測画像をリサイズ
-
-    Args:
-        observations: [T, H, W, C] の観測画像
-        target_size: リサイズ後のサイズ (int)
-
-    Returns:
-        リサイズされた観測画像 [T, target_size, target_size, C]
-    """
-    if HAS_CV2:
-        # OpenCVを使用（高速）
-        resized = []
-        for obs in observations:
-            resized_obs = cv2.resize(
-                obs, (target_size, target_size), interpolation=cv2.INTER_AREA
-            )
-            # グレースケールの場合は次元を追加
-            if len(resized_obs.shape) == 2:
-                resized_obs = resized_obs[:, :, np.newaxis]
-            resized.append(resized_obs)
-        return np.array(resized)
-    else:
-        # NumPyのみを使用（遅い）
-        import warnings
-
-        warnings.warn(
-            "Using slow fallback for resizing. Install opencv-python for better performance."
-        )
-
-        T, H, W, C = observations.shape
-        resized = np.zeros((T, target_size, target_size, C), dtype=observations.dtype)
-
-        for t in range(T):
-            for c in range(C):
-                # 簡易的なリサイズ（最近傍補間）
-                y_ratio = H / target_size
-                x_ratio = W / target_size
-
-                for i in range(target_size):
-                    for j in range(target_size):
-                        src_y = int(i * y_ratio)
-                        src_x = int(j * x_ratio)
-                        resized[t, i, j, c] = observations[t, src_y, src_x, c]
-
-        return resized
 
 
 def pad_episode(episode, target_length):
@@ -156,7 +99,7 @@ def pad_episode(episode, target_length):
 
     Args:
         episode: エピソードデータ
-        target_length: 目標長
+        target_length: 目標長（観測数）
 
     Returns:
         パディングされたエピソード
@@ -167,9 +110,9 @@ def pad_episode(episode, target_length):
         # 切り詰め
         return {
             "observations": episode["observations"][:target_length],
-            "actions": episode["actions"][: target_length - 1],
-            "rewards": episode["rewards"][: target_length - 1],
-            "dones": episode["dones"][: target_length - 1],
+            "actions": episode["actions"][:target_length - 1],
+            "rewards": episode["rewards"][:target_length - 1],
+            "dones": episode["dones"][:target_length - 1],
         }
     else:
         # パディング
@@ -213,15 +156,34 @@ def pad_episode(episode, target_length):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="MiniGridデータ生成")
+    parser = argparse.ArgumentParser(description="MiniGrid PLDM Data Generation")
     parser.add_argument(
-        "--env_name", type=str, default="MiniGrid-Empty-8x8-v0", help="MiniGrid環境名"
+        "--env_name",
+        type=str,
+        default="MiniGrid-LongHorizon-Level1-v0",
+        help="MiniGrid環境名 (Level1/2/3)",
     )
     parser.add_argument(
         "--n_episodes", type=int, default=1000, help="生成するエピソード数"
     )
     parser.add_argument(
         "--output_path", type=str, required=True, help="出力ファイルパス (.npz)"
+    )
+    parser.add_argument(
+        "--obs_size",
+        type=int,
+        default=72,
+        help="観測画像のサイズ (64, 72, 84など)",
+    )
+    parser.add_argument(
+        "--channel_first",
+        action="store_true",
+        help="チャンネルファーストフォーマット (C, H, W) を使用",
+    )
+    parser.add_argument(
+        "--normalize",
+        action="store_true",
+        help="観測を[0, 1]に正規化（float32）",
     )
     parser.add_argument(
         "--policy_type",
@@ -243,27 +205,6 @@ def main():
         default=None,
         help="エピソードをパディングする長さ（指定しない場合は可変長）",
     )
-    parser.add_argument(
-        "--render", action="store_true", help="レンダリングを有効化（デバッグ用）"
-    )
-    parser.add_argument(
-        "--resize",
-        type=int,
-        default=None,
-        help="観測画像のリサイズサイズ（指定しない場合は元のサイズ、例: 64, 84）",
-    )
-    parser.add_argument(
-        "--tile_size",
-        type=int,
-        default=8,
-        help="MiniGridのタイルサイズ（デフォルト: 8）",
-    )
-    parser.add_argument(
-        "--agent_view_size",
-        type=int,
-        default=None,
-        help="エージェントの視界サイズ（指定しない場合は全体観測）",
-    )
 
     args = parser.parse_args()
 
@@ -272,47 +213,34 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     print("=" * 60)
-    print("MiniGrid Data Generation")
+    print("MiniGrid PLDM Data Generation")
     print("=" * 60)
     print(f"Environment: {args.env_name}")
     print(f"Episodes: {args.n_episodes}")
     print(f"Output: {args.output_path}")
+    print(f"Observation size: {args.obs_size}x{args.obs_size}")
+    print(f"Channel first: {args.channel_first}")
+    print(f"Normalize: {args.normalize}")
     print(f"Policy: {args.policy_type}")
     print(f"Max steps: {args.max_steps if args.max_steps else 'Default'}")
-    print(f"Tile size: {args.tile_size}")
-    print(
-        f"Agent view size: {args.agent_view_size if args.agent_view_size else 'Full'}"
-    )
-    if args.resize is not None:
-        print(f"Resize: {args.resize}x{args.resize}")
-    else:
-        print("Resize: None (original size)")
+    if args.pad_length:
+        print(f"Pad length: {args.pad_length}")
     print("=" * 60)
 
-    # 環境の作成
-    env_kwargs = {
-        "render_mode": "human" if args.render else None,
-        "tile_size": args.tile_size,
-        "highlight": False,  # エージェント視野のハイライトを無効化
-    }
-
-    if args.max_steps is not None:
-        env_kwargs["max_steps"] = args.max_steps
-
-    if args.agent_view_size is not None:
-        env_kwargs["agent_view_size"] = args.agent_view_size
-
-    env = gym.make(args.env_name, **env_kwargs)
-
-    # RGBImgObsWrapperで完全観測のRGB画像に変換
-    env = RGBImgObsWrapper(env, tile_size=args.tile_size)
-    # ImgObsWrapperで辞書から画像のみを取り出す
-    env = ImgObsWrapper(env)
+    # 環境の作成（PLDMWrapper適用）
+    env = make_pldm_env(
+        args.env_name,
+        size=(args.obs_size, args.obs_size),
+        channel_first=args.channel_first,
+        normalize=args.normalize,
+    )
 
     print(f"\nEnvironment created:")
     print(f"  Observation space: {env.observation_space}")
     print(f"  Action space: {env.action_space}")
-    print(f"  Max steps: {env.max_steps if hasattr(env, 'max_steps') else 'N/A'}")
+    unwrapped = env.unwrapped
+    print(f"  Grid size: {unwrapped.width}x{unwrapped.height}")
+    print(f"  Max steps: {unwrapped.max_steps}")
 
     # ポリシーの作成
     if args.policy_type == "random":
@@ -328,16 +256,10 @@ def main():
 
     for ep_idx in tqdm(range(args.n_episodes), desc="Episodes"):
         episode = generate_episode(
-            env, policy, max_steps=args.max_steps or 1000, seed=args.seed + ep_idx
+            env, policy, max_steps=args.max_steps, seed=args.seed + ep_idx
         )
 
         episode_lengths.append(len(episode["observations"]))
-
-        # リサイズ（必要な場合）
-        if args.resize is not None:
-            episode["observations"] = resize_observations(
-                episode["observations"], args.resize
-            )
 
         # パディング（必要な場合）
         if args.pad_length is not None:
@@ -391,14 +313,19 @@ def main():
     # 形状情報
     print(f"\nSaved data shapes:")
     print(f"  Observations: {observations.shape}")
+    if args.pad_length is not None and len(all_episodes) > 0:
+        print(f"  First episode obs shape: {all_episodes[0]['observations'].shape}")
     print(f"  Actions: {actions.shape}")
     print(f"  Rewards: {rewards.shape}")
     print(f"  Dones: {dones.shape}")
 
-    if args.pad_length is not None and len(all_episodes) > 0:
-        print(f"\nSample episode shapes (after padding):")
-        print(f"  Observations: {all_episodes[0]['observations'].shape}")
-        print(f"  Actions: {all_episodes[0]['actions'].shape}")
+    # サンプルデータの値範囲
+    if len(all_episodes) > 0:
+        sample_obs = all_episodes[0]['observations'][0]
+        print(f"\nSample observation:")
+        print(f"  Shape: {sample_obs.shape}")
+        print(f"  Dtype: {sample_obs.dtype}")
+        print(f"  Value range: [{sample_obs.min():.3f}, {sample_obs.max():.3f}]")
 
     print("\n" + "=" * 60)
     print("Data generation completed!")

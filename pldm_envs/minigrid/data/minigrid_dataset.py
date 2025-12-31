@@ -1,88 +1,134 @@
 """
 MiniGrid環境のデータセットクラス
 
-オフラインデータ、またはオンライン生成の両方に対応
+オフラインデータからMiniGrid LongHorizon環境のデータをロードし、
+PLDM学習用に前処理を行います。
 """
 
 import torch
 import numpy as np
-from typing import Optional
-import pickle
+from typing import Optional, NamedTuple
 from pathlib import Path
+from dataclasses import dataclass
 
-from pldm_envs.minigrid.enums import MiniGridSample, MiniGridDatasetConfig
+from pldm_envs.utils.normalizer import Normalizer
+
+
+class MiniGridSample(NamedTuple):
+    """
+    MiniGridデータセットのサンプル
+
+    Attributes:
+        states: 観測画像 [T, C, H, W] torch.Tensor (float32)
+        actions: アクション [T-1, 1] torch.Tensor (long)
+        rewards: 報酬 [T-1] torch.Tensor (float32) - オプション
+        dones: 終端フラグ [T-1] torch.Tensor (bool) - オプション
+    """
+    states: torch.Tensor
+    actions: torch.Tensor
+    rewards: Optional[torch.Tensor] = None
+    dones: Optional[torch.Tensor] = None
+
+
+@dataclass
+class MiniGridDatasetConfig:
+    """
+    MiniGridデータセットの設定
+
+    Attributes:
+        data_path: データファイルのパス (.npz)
+        val_path: 検証データのパス (.npz, オプション)
+        sample_length: サンプルの時系列長（コンテキスト長）
+        img_size: 画像サイズ（64, 72など）
+        normalize_images: 画像を[0, 1]に正規化するか
+        include_rewards: 報酬を含めるか
+        include_dones: 終端フラグを含めるか
+        batch_size: バッチサイズ
+        crop_length: データセットを切り詰める長さ（None=全て使用）
+        train: 訓練モードか検証モードか
+        quick_debug: デバッグモード（少量データで高速化）
+    """
+    data_path: str = "data/minigrid/level1_train.npz"  # デフォルトパス
+    val_path: Optional[str] = None  # 検証データパス（オプション）
+    sample_length: int = 16
+    img_size: int = 64
+    normalize_images: bool = True
+    include_rewards: bool = False
+    include_dones: bool = False
+    batch_size: int = 32
+    crop_length: Optional[int] = None
+    train: bool = True
+    quick_debug: bool = False
 
 
 class MiniGridDataset(torch.utils.data.Dataset):
     """
-    MiniGrid環境のデータセットクラス
+    MiniGrid LongHorizon環境のデータセットクラス
 
-    オフラインデータ（.npz, .pklファイル）からデータをロード
+    オフラインデータ（.npzファイル）からデータをロードし、
+    スライディングウィンドウでサンプリングします。
 
     データフォーマット:
         NPZ形式:
-            - observations: [N_episodes, T, H, W, C]
-            - actions: [N_episodes, T-1]
-            - rewards: [N_episodes, T-1] (オプション)
-            - dones: [N_episodes, T-1] (オプション)
+            - observations: [N_episodes, T, H, W, C] uint8 [0-255]
+            - actions: [N_episodes, T-1] int
+            - rewards: [N_episodes, T-1] float (オプション)
+            - dones: [N_episodes, T-1] bool (オプション)
 
-        PKL形式:
-            - List of episodes, 各エピソードは dict{'obs', 'actions', ...}
+    使用例:
+        config = MiniGridDatasetConfig(
+            data_path='data/minigrid/level1_train.npz',
+            sample_length=16,
+            img_size=64,
+        )
+        dataset = MiniGridDataset(config)
+        sample = dataset[0]  # MiniGridSample
     """
 
     def __init__(
         self,
         config: MiniGridDatasetConfig,
-        normalizer=None,
+        normalizer: Optional[Normalizer] = None,
     ):
+        """
+        Args:
+            config: データセット設定
+            normalizer: 正規化器（訓練データから作成）
+        """
         self.config = config
         self.normalizer = normalizer
-
-        if config.online_mode:
-            raise NotImplementedError(
-                "Online mode not yet implemented. "
-                "Please use offline mode with data_path specified."
-            )
 
         # データのロード
         self._load_data()
 
-        print(f"Loaded MiniGrid {config.env_name} dataset with {len(self)} samples")
+        print(f"Loaded MiniGrid dataset from {config.data_path}")
+        print(f"  Total samples: {len(self)}")
 
     def _load_data(self):
-        """データをロードする"""
-        if self.config.data_path is None:
-            raise ValueError("data_path must be specified for offline mode")
-
+        """NPZファイルからデータをロード"""
         data_path = Path(self.config.data_path)
 
-        if data_path.suffix == '.npz':
-            self._load_npz(data_path)
-        elif data_path.suffix == '.pkl':
-            self._load_pkl(data_path)
-        else:
+        if not data_path.exists():
+            raise FileNotFoundError(f"Data file not found: {data_path}")
+
+        if data_path.suffix != '.npz':
             raise ValueError(
                 f"Unsupported file format: {data_path.suffix}. "
-                "Supported formats: .npz, .pkl"
+                "Only .npz format is supported."
             )
 
-        # スライディングウィンドウの設定
-        self._setup_slicing()
+        print(f"Loading NPZ file from {data_path}")
 
-    def _load_npz(self, path: Path):
-        """NPZファイルからデータをロード"""
-        print(f"Loading NPZ file from {path}")
-
+        # メモリマップモードで読み込み（大量データでもメモリ節約）
         if self.config.quick_debug:
-            data = np.load(path, allow_pickle=True)
+            data = np.load(data_path, allow_pickle=True)
         else:
-            # メモリマップモードで読み込み（メモリ節約）
-            data = np.load(path, allow_pickle=True, mmap_mode='r')
+            data = np.load(data_path, allow_pickle=True, mmap_mode='r')
 
-        # observations: [N_episodes, T, H, W, C]
+        # observations: [N_episodes, T, H, W, C] uint8
         self.observations = data['observations']
 
-        # actions: [N_episodes, T-1]
+        # actions: [N_episodes, T-1] int
         self.actions = data['actions']
 
         # 報酬（オプション）
@@ -97,32 +143,26 @@ class MiniGridDataset(torch.utils.data.Dataset):
         else:
             self.dones = None
 
-        print(f"  Observations shape: {self.observations.shape}")
-        print(f"  Actions shape: {self.actions.shape}")
+        print(f"  Observations: {self.observations.shape} {self.observations.dtype}")
+        print(f"  Actions: {self.actions.shape} {self.actions.dtype}")
 
-    def _load_pkl(self, path: Path):
-        """PKLファイルからデータをロード"""
-        print(f"Loading PKL file from {path}")
-
-        with open(path, 'rb') as f:
-            episodes = pickle.load(f)
-
-        # List[Dict] -> numpy arrays に変換
-        self.observations = np.array([ep['obs'] for ep in episodes])
-        self.actions = np.array([ep['actions'] for ep in episodes])
-
-        if self.config.include_rewards:
-            self.rewards = np.array([ep.get('rewards', None) for ep in episodes])
-        else:
-            self.rewards = None
-
-        if self.config.include_dones:
-            self.dones = np.array([ep.get('dones', None) for ep in episodes])
-        else:
-            self.dones = None
+        # スライディングウィンドウの設定
+        self._setup_slicing()
 
     def _setup_slicing(self):
         """スライディングウィンドウの設定"""
+        # observations.dtype が object の場合（可変長エピソード）
+        if self.observations.dtype == object:
+            # 可変長エピソード
+            self.variable_length = True
+            self._setup_variable_length_slicing()
+        else:
+            # 固定長エピソード
+            self.variable_length = False
+            self._setup_fixed_length_slicing()
+
+    def _setup_fixed_length_slicing(self):
+        """固定長エピソードのスライシング設定"""
         # エピソード長
         self.episode_length = self.observations.shape[1]
 
@@ -150,6 +190,37 @@ class MiniGridDataset(torch.utils.data.Dataset):
         print(f"  Slices per episode: {self.slices_per_episode}")
         print(f"  Total slices: {self.total_slices}")
 
+    def _setup_variable_length_slicing(self):
+        """可変長エピソードのスライシング設定"""
+        # 各エピソードの長さとスライス数を計算
+        self.episode_lengths = []
+        self.slices_per_episode_list = []
+        cumulative_slices = 0
+        self.slice_to_episode_map = []
+
+        for ep_idx in range(len(self.observations)):
+            ep_length = len(self.observations[ep_idx])
+            self.episode_lengths.append(ep_length)
+
+            # このエピソードから取れるスライス数
+            effective_sample_length = min(self.config.sample_length, ep_length)
+            slices = max(1, ep_length - effective_sample_length + 1)
+            self.slices_per_episode_list.append(slices)
+
+            # スライスIDからエピソードへのマッピング
+            for _ in range(slices):
+                self.slice_to_episode_map.append((ep_idx, cumulative_slices))
+                cumulative_slices += 1
+
+        self.total_slices = cumulative_slices
+
+        print(f"  Variable length episodes: {len(self.observations)}")
+        print(f"  Episode lengths: min={min(self.episode_lengths)}, "
+              f"max={max(self.episode_lengths)}, "
+              f"mean={np.mean(self.episode_lengths):.1f}")
+        print(f"  Sample length: {self.config.sample_length}")
+        print(f"  Total slices: {self.total_slices}")
+
     def __len__(self):
         """データセットの長さを返す"""
         if self.config.crop_length is not None:
@@ -166,6 +237,13 @@ class MiniGridDataset(torch.utils.data.Dataset):
         Returns:
             MiniGridSample: 観測、アクション、その他の情報を含む
         """
+        if self.variable_length:
+            return self._getitem_variable_length(idx)
+        else:
+            return self._getitem_fixed_length(idx)
+
+    def _getitem_fixed_length(self, idx: int) -> MiniGridSample:
+        """固定長エピソードからサンプルを取得"""
         # エピソードとスライス位置を計算
         episode_idx = idx // self.slices_per_episode
         slice_start = idx % self.slices_per_episode
@@ -207,25 +285,80 @@ class MiniGridDataset(torch.utils.data.Dataset):
 
         return sample
 
+    def _getitem_variable_length(self, idx: int) -> MiniGridSample:
+        """可変長エピソードからサンプルを取得"""
+        # エピソードとスライス位置を特定
+        episode_idx = None
+        for ep_idx, slices in enumerate(self.slices_per_episode_list):
+            if idx < slices:
+                episode_idx = ep_idx
+                slice_offset = idx
+                break
+            idx -= slices
+
+        if episode_idx is None:
+            raise IndexError(f"Index {idx} out of range")
+
+        ep_length = self.episode_lengths[episode_idx]
+        effective_sample_length = min(self.config.sample_length, ep_length)
+
+        slice_start = slice_offset
+        slice_end = slice_start + effective_sample_length
+
+        # データの取得 (object配列から取り出す)
+        obs = self.observations[episode_idx][slice_start:slice_end]  # [T, H, W, C]
+        actions = self.actions[episode_idx][slice_start:slice_end-1]  # [T-1]
+
+        # numpy配列に変換（明示的にdtypeを指定）
+        obs = np.array(obs, dtype=np.uint8)
+        actions = np.array(actions, dtype=np.int64)
+
+        # 画像の前処理
+        obs = self._preprocess_observations(obs)
+
+        # Tensorに変換
+        states = torch.from_numpy(obs).float()  # [T, C, H, W]
+        actions = torch.from_numpy(actions).long().unsqueeze(-1)  # [T-1, 1]
+
+        # 報酬とdones（オプション）
+        rewards = None
+        dones = None
+        if self.rewards is not None:
+            rewards_data = np.array(self.rewards[episode_idx][slice_start:slice_end-1])
+            rewards = torch.from_numpy(rewards_data).float()
+        if self.dones is not None:
+            dones_data = np.array(self.dones[episode_idx][slice_start:slice_end-1])
+            dones = torch.from_numpy(dones_data).bool()
+
+        sample = MiniGridSample(
+            states=states,
+            actions=actions,
+            rewards=rewards,
+            dones=dones,
+        )
+
+        return sample
+
     def _preprocess_observations(self, obs: np.ndarray) -> np.ndarray:
         """
         観測画像の前処理
 
         Args:
-            obs: [T, H, W, C]
+            obs: [T, H, W, C] uint8 [0-255]
 
         Returns:
-            preprocessed: [T, C, H, W]
+            preprocessed: [T, C, H, W] float32 [0-1] or uint8 [0-255]
         """
         # チャンネルを先頭に移動: [T, H, W, C] -> [T, C, H, W]
         obs = np.transpose(obs, (0, 3, 1, 2))
 
         # リサイズ（必要な場合）
-        if obs.shape[2] != self.config.img_size or obs.shape[3] != self.config.img_size:
+        current_size = obs.shape[2]
+        if current_size != self.config.img_size:
             obs = self._resize_observations(obs)
 
         # 正規化 (0-255 -> 0-1)
-        if self.config.normalize_images and obs.max() > 1:
+        if self.config.normalize_images:
             obs = obs.astype(np.float32) / 255.0
 
         return obs
@@ -240,30 +373,19 @@ class MiniGridDataset(torch.utils.data.Dataset):
         Returns:
             resized: [T, C, img_size, img_size]
         """
-        try:
-            import cv2
-            T, C, H, W = obs.shape
-            resized = np.zeros((T, C, self.config.img_size, self.config.img_size), dtype=obs.dtype)
+        # torch.nn.functionalを使用してリサイズ
+        import torch.nn.functional as F
 
-            for t in range(T):
-                for c in range(C):
-                    resized[t, c] = cv2.resize(
-                        obs[t, c],
-                        (self.config.img_size, self.config.img_size),
-                        interpolation=cv2.INTER_AREA
-                    )
-            return resized
+        obs_tensor = torch.from_numpy(obs).float()
+        resized = F.interpolate(
+            obs_tensor,
+            size=(self.config.img_size, self.config.img_size),
+            mode='bilinear',
+            align_corners=False
+        )
 
-        except ImportError:
-            # cv2がない場合はtorchvisionを使用
-            import torch
-            import torch.nn.functional as F
-
-            obs_tensor = torch.from_numpy(obs).float()
-            resized = F.interpolate(
-                obs_tensor,
-                size=(self.config.img_size, self.config.img_size),
-                mode='bilinear',
-                align_corners=False
-            )
+        # 元のdtypeに戻す
+        if obs.dtype == np.uint8:
+            return resized.numpy().astype(np.uint8)
+        else:
             return resized.numpy()

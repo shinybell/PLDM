@@ -41,9 +41,10 @@ def test_environment():
         max_steps=200,
         tile_size=8,
         render_mode=None,
+        highlight=False,  # エージェント視野のハイライトを無効化
     )
     # RGBImgObsWrapperで完全観測のRGB画像に変換
-    env = RGBImgObsWrapper(env)
+    env = RGBImgObsWrapper(env, tile_size=8)
     # ImgObsWrapperで辞書から画像のみを取り出す
     env = ImgObsWrapper(env)
 

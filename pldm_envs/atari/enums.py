@@ -98,7 +98,9 @@ class AtariDatasetConfig:
         if self.grayscale:
             self.obs_type = "grayscale"
 
-        if not self.online_mode and self.data_path is None:
-            raise ValueError(
-                "offline mode requires data_path to be specified"
-            )
+        # NOTE: data_pathの検証はデータセット作成時に行う
+        # TrainConfigの初期化時にはチェックしない
+        # if not self.online_mode and self.data_path is None:
+        #     raise ValueError(
+        #         "offline mode requires data_path to be specified"
+        #     )

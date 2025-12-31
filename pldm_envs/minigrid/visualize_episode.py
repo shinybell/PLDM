@@ -86,6 +86,16 @@ def visualize_episode(
     episode_rewards = rewards[episode_idx]
     episode_dones = dones[episode_idx]
 
+    # object型の場合はuint8に変換
+    if episode_obs.dtype == object:
+        episode_obs = np.array(episode_obs, dtype=np.uint8)
+    if episode_actions.dtype == object:
+        episode_actions = np.array(episode_actions, dtype=np.int64)
+    if episode_rewards.dtype == object:
+        episode_rewards = np.array(episode_rewards, dtype=np.float32)
+    if episode_dones.dtype == object:
+        episode_dones = np.array(episode_dones, dtype=bool)
+
     print(f"\nEpisode {episode_idx}:")
     print(f"  Observations: {episode_obs.shape}")
     print(f"  Total frames: {len(episode_obs)}")
@@ -263,8 +273,8 @@ def visualize_live_episode(
         return
 
     # 環境の作成
-    env = gym.make(env_name, max_steps=max_steps, tile_size=8, render_mode=None)
-    env = RGBImgObsWrapper(env)  # 完全観測のRGB画像に変換
+    env = gym.make(env_name, max_steps=max_steps, tile_size=8, render_mode=None, highlight=False)
+    env = RGBImgObsWrapper(env, tile_size=8)  # 完全観測のRGB画像に変換
     env = ImgObsWrapper(env)  # 辞書から画像のみを取り出す
 
     print(f"\nRunning episode in {env_name}...")
@@ -409,4 +419,10 @@ if __name__ == "__main__":
         if args.data_path is None:
             print("Error: --data_path is required (or use --live mode)")
             exit(1)
-        visualize_episode(args.data_path, args.episode_idx, args.output_path, args.max_frames)
+
+        # output_pathが指定されていない場合、output_dirを使用
+        output_path = args.output_path
+        if output_path is None and args.output_dir:
+            output_path = f"{args.output_dir}/minigrid_episode_{args.episode_idx}_visualization.png"
+
+        visualize_episode(args.data_path, args.episode_idx, output_path, args.max_frames)

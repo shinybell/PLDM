@@ -10,6 +10,7 @@ from pldm_envs.wall.data.wall_expert import WallExpertDatasetConfig
 
 from pldm_envs.diverse_maze.enums import D4RLDatasetConfig
 from pldm_envs.atari.enums import AtariDatasetConfig
+from pldm_envs.minigrid.enums import MiniGridDatasetConfig
 
 
 class DatasetType(Enum):
@@ -21,6 +22,7 @@ class DatasetType(Enum):
     D4RLEigf = auto()
     LocoMaze = auto()
     Atari = auto()
+    MiniGrid = auto()
 
 
 class ProbingDatasets(NamedTuple):
@@ -51,6 +53,9 @@ class DataConfig(ConfigBase):
 
     # Atari設定
     atari_config: AtariDatasetConfig = field(default_factory=AtariDatasetConfig)
+
+    # MiniGrid設定
+    minigrid_config: MiniGridDatasetConfig = field(default_factory=MiniGridDatasetConfig)
 
     normalize: bool = False
     min_max_normalize_state: bool = False

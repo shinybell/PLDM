@@ -1,0 +1,99 @@
+# MiniGrid Long-Horizon Level 3 環境の設定ファイル
+# Level 3: High wall complexity (24x24 grid, dense maze)
+# Grid size: 24x24 (fixed), Max steps: 256 (fixed)
+
+env_name: long_horizon_level3
+
+# データ設定
+data:
+  dataset_type: MiniGrid
+  normalize: true
+  min_max_normalize_state: false
+  num_workers: 4
+
+  minigrid_config:
+    env_name: "MiniGrid-LongHorizon-Level3-v0"
+    batch_size: 32
+    sample_length: 17
+    train: true
+
+    # データソース（要変更: 実際のデータパスを指定）
+    online_mode: false
+    data_path: data/minigrid/long_horizon_level3_train.npz
+    val_path: data/minigrid/long_horizon_level3_val.npz
+
+    # 画像設定
+    img_size: 64
+    tile_size: 8
+    agent_view_size: null  # null=全体観測
+
+    # MiniGrid設定
+    max_steps: 256  # すべてのレベルで統一
+    render_mode: null
+    highlight: false
+
+    # 前処理
+    normalize_images: true
+    include_rewards: false
+    include_dones: false
+
+    # デバッグ
+    quick_debug: false
+    crop_length: null
+    seed: 42
+
+# モデル設定
+hjepa:
+  level1:
+    backbone:
+      arch: resnet18  # 同じグリッドサイズなのでresnet18で統一
+    action_dim: 7  # MiniGridのアクション数
+  disable_l2: true
+
+# 目的関数設定
+objectives_l1:
+  objectives:
+    - VICReg  # 表現学習
+    - IDM     # Inverse Dynamics Model（アクション予測）
+
+  vicreg:
+    enabled: true
+    lambda_inv: 25.0
+    lambda_var: 25.0
+    lambda_cov: 1.0
+
+  idm:
+    enabled: true
+    action_dim: 7  # MiniGridのアクション数
+
+# 訓練設定
+n_steps: 17
+val_n_steps: 17
+epochs: 250
+base_lr: 0.0001
+optimizer_type: Adam
+optimizer_schedule: Cosine
+
+save_every_n_epochs: 10
+eval_every_n_epochs: 20
+
+# 出力設定
+output_root: ./outputs
+output_dir: minigrid_long_horizon_level3
+
+# WandB設定
+wandb: true
+run_name: minigrid_level3_24x24_complex
+run_project: PLDM-MiniGrid-LongHorizon
+
+# 評価設定
+eval_cfg:
+  env_name: long_horizon_level3
+  eval_l1: true
+  eval_l2: false
+  disable_planning: true  # 初期実装ではプランニング評価を無効化
+
+  probing:
+    probe_preds: true
+    probe_encoder: true
+    l1_depth: 17

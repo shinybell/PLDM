@@ -18,6 +18,9 @@ from pldm_envs.diverse_maze.d4rl import D4RLDataset
 # Atari dataset
 from pldm_envs.atari.data.atari_dataset import AtariDataset
 
+# MiniGrid dataset
+from pldm_envs.minigrid.data import MiniGridDataset, minigrid_collate_fn
+
 from pldm.probing.evaluator import ProbingConfig
 from pldm_envs.utils.normalizer import Normalizer
 from pldm.data.enums import DataConfig, DatasetType, ProbingDatasets, Datasets
@@ -47,6 +50,8 @@ class DatasetFactory:
             return self._create_locomaze_datasets()
         elif self.config.dataset_type == DatasetType.Atari:
             return self._create_atari_datasets()
+        elif self.config.dataset_type == DatasetType.MiniGrid:
+            return self._create_minigrid_datasets()
         else:
             raise NotImplementedError
 
@@ -246,6 +251,48 @@ class DatasetFactory:
                 normalizer=ds.normalizer,
                 suffix="atari_val",
                 train=False,
+            )
+
+        datasets = Datasets(
+            ds=ds,
+            val_ds=val_ds,
+        )
+
+        return datasets
+
+    def _create_minigrid_datasets(self):
+        """
+        MiniGridデータセットを作成
+
+        Returns:
+            Datasets: 訓練データセット、検証データセット（オプション）
+        """
+        # 訓練データセット
+        ds = MiniGridDataset(self.config.minigrid_config)
+        ds = make_dataloader(
+            ds=ds,
+            loader_config=self.config,
+            suffix="minigrid_train",
+            collate_fn=minigrid_collate_fn,
+        )
+
+        # 検証データセット（オプション）
+        val_ds = None
+        if self.config.minigrid_config.val_path is not None:
+            val_ds = MiniGridDataset(
+                dataclasses.replace(
+                    self.config.minigrid_config,
+                    data_path=self.config.minigrid_config.val_path,
+                    train=False,
+                )
+            )
+            val_ds = make_dataloader(
+                ds=val_ds,
+                loader_config=self.config,
+                normalizer=ds.normalizer,
+                suffix="minigrid_val",
+                train=False,
+                collate_fn=minigrid_collate_fn,
             )
 
         datasets = Datasets(
