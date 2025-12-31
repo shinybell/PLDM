@@ -39,10 +39,23 @@ def load_model(checkpoint_path: str, config_path: str = None):
     # 設定をロード（チェックポイントまたは設定ファイルから）
     if config_path:
         from omegaconf import OmegaConf
-        config = OmegaConf.load(config_path)
-        config = TrainConfig(**config)
+        config_dict = OmegaConf.load(config_path)
     elif 'config' in checkpoint:
+        # チェックポイントに設定が含まれている場合
         config = checkpoint['config']
+        # モデルを作成
+        model = HJEPA(config.hjepa)
+
+        # 重みをロード
+        if 'model_state_dict' in checkpoint:
+            model.load_state_dict(checkpoint['model_state_dict'])
+        elif 'model' in checkpoint:
+            model.load_state_dict(checkpoint['model'])
+        else:
+            model.load_state_dict(checkpoint)
+
+        model.eval()
+        return model, config
     else:
         # チェックポイントと同じディレクトリにある設定ファイルを探す
         checkpoint_dir = Path(checkpoint_path).parent.parent / "configs" / "minigrid"
@@ -50,13 +63,23 @@ def load_model(checkpoint_path: str, config_path: str = None):
         if possible_configs:
             print(f"Config not found in checkpoint. Using {possible_configs[0]}")
             from omegaconf import OmegaConf
-            config = OmegaConf.load(possible_configs[0])
-            config = TrainConfig(**config)
+            config_dict = OmegaConf.load(possible_configs[0])
         else:
             raise ValueError(
                 "Config not found in checkpoint and no config_path provided. "
                 "Please specify --config path/to/config.yaml"
             )
+
+    # OmegaConfの辞書から直接モデル設定を取得
+    # TrainConfig.__post_init__を回避するため、直接hjepaにアクセス
+    from omegaconf import OmegaConf
+
+    # SimpleNamespaceとして扱う（TrainConfigの初期化をスキップ）
+    class SimpleConfig:
+        def __init__(self, hjepa_config):
+            self.hjepa = hjepa_config
+
+    config = SimpleConfig(config_dict.hjepa)
 
     # モデルを作成
     model = HJEPA(config.hjepa)
