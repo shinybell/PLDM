@@ -34,7 +34,7 @@ def load_model(checkpoint_path: str, config_path: str = None):
         model: ロードされたモデル
         config: トレーニング設定
     """
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
 
     # 設定をロード（チェックポイントまたは設定ファイルから）
     if config_path:
@@ -44,7 +44,19 @@ def load_model(checkpoint_path: str, config_path: str = None):
     elif 'config' in checkpoint:
         config = checkpoint['config']
     else:
-        raise ValueError("Config not found in checkpoint and no config_path provided")
+        # チェックポイントと同じディレクトリにある設定ファイルを探す
+        checkpoint_dir = Path(checkpoint_path).parent.parent / "configs" / "minigrid"
+        possible_configs = list(checkpoint_dir.glob("*.yaml"))
+        if possible_configs:
+            print(f"Config not found in checkpoint. Using {possible_configs[0]}")
+            from omegaconf import OmegaConf
+            config = OmegaConf.load(possible_configs[0])
+            config = TrainConfig(**config)
+        else:
+            raise ValueError(
+                "Config not found in checkpoint and no config_path provided. "
+                "Please specify --config path/to/config.yaml"
+            )
 
     # モデルを作成
     model = HJEPA(config.hjepa)
@@ -52,7 +64,10 @@ def load_model(checkpoint_path: str, config_path: str = None):
     # 重みをロード
     if 'model_state_dict' in checkpoint:
         model.load_state_dict(checkpoint['model_state_dict'])
+    elif 'model' in checkpoint:
+        model.load_state_dict(checkpoint['model'])
     else:
+        # チェックポイント自体がstate_dictの場合
         model.load_state_dict(checkpoint)
 
     model.eval()
