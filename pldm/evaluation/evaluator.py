@@ -55,15 +55,19 @@ class Evaluator:
         self.output_path = output_path
         self.data_config = data_config  # wall_config
 
-        self.probing_evaluator = ProbingEvaluator(
-            model=self.model,
-            config=self.config.probing,
-            quick_debug=self.quick_debug,
-            probing_datasets=probing_datasets,
-            l2_probing_datasets=l2_probing_datasets,
-            load_checkpoint_path=load_checkpoint_path,
-            output_path=output_path,
-        )
+        # ProbingEvaluatorはprobing_datasetsが利用可能な場合のみ作成
+        if probing_datasets is not None:
+            self.probing_evaluator = ProbingEvaluator(
+                model=self.model,
+                config=self.config.probing,
+                quick_debug=self.quick_debug,
+                probing_datasets=probing_datasets,
+                l2_probing_datasets=l2_probing_datasets,
+                load_checkpoint_path=load_checkpoint_path,
+                output_path=output_path,
+            )
+        else:
+            self.probing_evaluator = None
 
         self.pixel_mapper = self._create_pixel_mapper()
         self.planning_config = self._get_planning_config()
@@ -73,12 +77,19 @@ class Evaluator:
             config = self.config.d4rl_planning
         elif self.config.env_name == "wall":
             config = self.config.wall_planning
+        elif "minigrid" in self.config.env_name:
+            # MiniGridではplanningは未実装
+            config = None
         else:
             raise NotImplementedError
         return config
 
     def evaluate_loc_probing(self):
         probers = {}
+
+        # probing_evaluatorが利用できない場合（例：MiniGrid）はスキップ
+        if self.probing_evaluator is None:
+            return probers, None
 
         if self.config.eval_l1:
             probers = self.probing_evaluator.train_pred_prober(
@@ -185,6 +196,9 @@ class Evaluator:
         return planning_evaluator
 
     def _get_planning_levels(self):
+        if self.planning_config is None:
+            return ([], [])
+
         levels = self.planning_config.levels.split(",")
 
         # if self.quick_debug:
@@ -203,8 +217,8 @@ class Evaluator:
 
         self.probers, self.probers_l2 = self.evaluate_loc_probing()
 
-        # Planning
-        if not self.config.disable_planning:
+        # Planning (planning_configがNoneの場合は自動的にスキップ)
+        if not self.config.disable_planning and self.planning_config is not None:
             if self.config.eval_l1:
                 levels, level_configs = self._get_planning_levels()
 
