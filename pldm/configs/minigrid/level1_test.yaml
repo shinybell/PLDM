@@ -112,6 +112,12 @@ eval_at_beginning: false
 eval_during_training: false
 eval_only: false
 
+eval_cfg:
+  env_name: *env_name  # minigrid_level1
+  eval_l1: true
+  eval_l2: false
+  disable_planning: false
+
 # 出力設定
 output_dir: minigrid_level1_test
 output_root: /Users/shunsei/works/MatsuoLab/WorldModel/PLDM/checkpoints
