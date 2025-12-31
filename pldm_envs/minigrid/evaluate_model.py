@@ -17,7 +17,7 @@ from tqdm import tqdm
 import gymnasium as gym
 
 from pldm.models.hjepa import HJEPA
-from pldm.configs.train_config import TrainConfig
+from pldm.train import TrainConfig
 from pldm_envs.minigrid.wrappers import RGBImgObservationWrapper, ResizeObservationWrapper
 
 
