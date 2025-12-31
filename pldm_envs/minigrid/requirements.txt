@@ -1,0 +1,18 @@
+# MiniGrid環境の必要パッケージ
+# 使い方: pip install -r pldm_envs/minigrid/requirements.txt
+
+# MiniGrid環境
+minigrid>=2.0.0
+
+# 依存関係（通常は自動でインストールされる）
+gymnasium>=0.29.0
+numpy>=1.21.0
+pygame>=2.1.0
+
+# データ生成・可視化用
+tqdm>=4.65.0
+pillow>=9.0.0
+
+# PyTorch（既にインストール済みの場合はスキップ可能）
+# torch>=2.0.0
+# torchvision>=0.15.0

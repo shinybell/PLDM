@@ -6,12 +6,16 @@ PLDM学習用に前処理を行います。
 """
 
 import torch
+import torch.nn.functional as F
 import numpy as np
 from typing import Optional, NamedTuple
 from pathlib import Path
 from dataclasses import dataclass
 
 from pldm_envs.utils.normalizer import Normalizer
+
+# MiniGridのアクション数（7つの離散アクション）
+MINIGRID_NUM_ACTIONS = 7
 
 
 class MiniGridSample(NamedTuple):
@@ -258,7 +262,9 @@ class MiniGridDataset(torch.utils.data.Dataset):
 
         # Tensorに変換
         states = torch.from_numpy(obs).float()  # [T, C, H, W]
-        actions = torch.from_numpy(actions).long().unsqueeze(-1)  # [T-1, 1]
+        actions_indices = torch.from_numpy(actions).long()  # [T-1]
+        # One-hotエンコーディング: [T-1] -> [T-1, NUM_ACTIONS]
+        actions = F.one_hot(actions_indices, num_classes=MINIGRID_NUM_ACTIONS).float()
 
         # 報酬の取得（オプション）
         if self.rewards is not None:
@@ -318,7 +324,9 @@ class MiniGridDataset(torch.utils.data.Dataset):
 
         # Tensorに変換
         states = torch.from_numpy(obs).float()  # [T, C, H, W]
-        actions = torch.from_numpy(actions).long().unsqueeze(-1)  # [T-1, 1]
+        actions_indices = torch.from_numpy(actions).long()  # [T-1]
+        # One-hotエンコーディング: [T-1] -> [T-1, NUM_ACTIONS]
+        actions = F.one_hot(actions_indices, num_classes=MINIGRID_NUM_ACTIONS).float()
 
         # 報酬とdones（オプション）
         rewards = None
