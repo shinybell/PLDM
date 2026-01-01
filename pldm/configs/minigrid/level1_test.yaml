@@ -150,9 +150,9 @@ eval_cfg:
     seed: 42
     error_threshold: 1.0
     max_episode_steps: 1000
-    levels: "easy"
+    levels: "level1"
 
-    easy:
+    level1:
       n_steps: 200
       n_envs: 4
       max_plan_length: 10
