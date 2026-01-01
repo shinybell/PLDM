@@ -243,7 +243,7 @@ class MiniGridMPCEvaluator(MPCEvaluator):
 
         # (bs, H, W, 3) -> (bs, 3, H, W) にチャンネル順序を変更
         obs_batch = torch.stack(observation_history).to(self.device)
-        obs_batch = obs_batch.permute(0, 3, 1, 2)
+        obs_batch = obs_batch.permute(0, 3, 1, 2).contiguous()
         observation_history = [obs_batch]
 
         # 目標観測を取得（環境がリセットされた後）
@@ -258,7 +258,7 @@ class MiniGridMPCEvaluator(MPCEvaluator):
         target_obs_batch = torch.stack(target_obs_list).to(self.device)  # (bs, H, W, 3)
 
         # チャンネルを最初の次元に移動 (bs, H, W, 3) -> (bs, 3, H, W)
-        target_obs_batch = target_obs_batch.permute(0, 3, 1, 2)
+        target_obs_batch = target_obs_batch.permute(0, 3, 1, 2).contiguous()
 
         # 正規化
         if self.normalizer is not None:
@@ -341,7 +341,7 @@ class MiniGridMPCEvaluator(MPCEvaluator):
             # 次の観測を準備
             obs_t = torch.stack(next_obs_list).to(self.device)  # (bs, H, W, 3)
             # チャンネルを最初の次元に移動 (bs, H, W, 3) -> (bs, 3, H, W)
-            obs_t = obs_t.permute(0, 3, 1, 2)
+            obs_t = obs_t.permute(0, 3, 1, 2).contiguous()
             if self.image_based:
                 obs_t = torch.cat([obs_t] * self.config.stack_states, dim=1)
             observation_history.append(obs_t)
