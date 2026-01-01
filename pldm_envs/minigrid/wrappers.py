@@ -34,8 +34,11 @@ class GoalRenderingMixin:
         # Get unwrapped environment
         unwrapped = self.unwrapped
 
-        # Save current agent state
-        original_pos = unwrapped.agent_pos.copy()
+        # Save current agent state (handle both tuple and array)
+        if isinstance(unwrapped.agent_pos, np.ndarray):
+            original_pos = unwrapped.agent_pos.copy()
+        else:
+            original_pos = tuple(unwrapped.agent_pos)
         original_dir = unwrapped.agent_dir
 
         # Set agent to target position
@@ -47,7 +50,10 @@ class GoalRenderingMixin:
         rgb_image = unwrapped.render()
 
         # Restore original agent state
-        unwrapped.agent_pos = original_pos
+        if isinstance(original_pos, tuple):
+            unwrapped.agent_pos = original_pos
+        else:
+            unwrapped.agent_pos = original_pos
         unwrapped.agent_dir = original_dir
 
         return rgb_image
