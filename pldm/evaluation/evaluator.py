@@ -121,6 +121,24 @@ class Evaluator:
     def _create_pixel_mapper(self):
         if "diverse" in self.config.env_name or "maze2d" in self.config.env_name:
             pixel_mapper = D4RLPixelMapper(env_name=self.config.env_name)
+        elif "minigrid" in self.config.env_name:
+            class MiniGridPixelMapper:
+                def __init__(self, img_size, grid_size=19):
+                    self.img_size = img_size
+                    self.grid_size = grid_size
+                    self.scale = img_size / grid_size
+
+                def obs_coord_to_pixel_coord(self, x):
+                    return x * self.scale
+
+                def pixel_coord_to_obs_coord(self, x):
+                    return x / self.scale
+
+            img_size = 64  # Default
+            if hasattr(self.data_config, "img_size"):
+                img_size = self.data_config.img_size
+            
+            pixel_mapper = MiniGridPixelMapper(img_size=img_size)
         else:
 
             class IdPixelMapper:
