@@ -12,13 +12,14 @@ from .utils import determine_terminations, calculate_success_rate
 from pldm.models.jepa import JEPA
 from pldm.planning.plotting import log_planning_plots, log_l1_planning_loss
 from pldm.planning.mpc import MPCEvaluator
-from pldm.planning.enums import PooledMPCResult
+from pldm.planning.enums import MPCResult
 from pldm.planning.minigrid.enums import MiniGridMPCConfig, MPCReport
 from pldm.planning import objectives_v2
 from pldm.planning.planners.enums import PlannerType
 from pldm.planning.planners.mppi_planner import MPPIPlanner
 from pldm.planning.planners.sgd_planner import SGDPlanner
 from pldm.planning.utils import normalize_actions
+from pldm.models.utils import flatten_conv_output
 
 
 class MiniGridMPCEvaluator(MPCEvaluator):
@@ -259,6 +260,7 @@ class MiniGridMPCEvaluator(MPCEvaluator):
         reward_history = []
         location_history = []
         pred_location_history = []
+        final_preds_dist_history = []
         loss_history = []
 
         # エージェントの初期位置を記録
@@ -281,6 +283,11 @@ class MiniGridMPCEvaluator(MPCEvaluator):
             )
             # プランナーには生の観測を渡す（プランナー内部でエンコードされる）
             planning_result = planner.plan(obs_t, plan_size=plan_size, repr_input=False)
+
+            # 予測された最終観測と目標観測との距離を計算
+            last_pred_obs = flatten_conv_output(planning_result.pred_obs)
+            pred_dist = torch.norm(last_pred_obs - targets_t.unsqueeze(0), dim=2).cpu()
+            final_preds_dist_history.append(pred_dist)
 
             # 最初のアクションを実行
             action = planning_result.actions[:, 0]  # (bs, action_dim)
@@ -319,15 +326,16 @@ class MiniGridMPCEvaluator(MPCEvaluator):
                 obs_t = torch.cat([obs_t] * self.config.stack_states, dim=1)
             observation_history.append(obs_t)
 
-        # 結果をPooledMPCResultにまとめる
-        result = PooledMPCResult(
+        # 結果をMPCResultにまとめる
+        result = MPCResult(
             observations=observation_history,
             locations=location_history,
-            actions=action_history,
-            rewards=reward_history,
-            pred_locations=pred_location_history if pred_location_history else None,
+            action_history=action_history,
+            reward_history=reward_history,
+            pred_locations=pred_location_history if pred_location_history else [],
+            final_preds_dist=final_preds_dist_history,
             targets=targets.cpu(),
-            loss_history=loss_history if loss_history else None,
+            loss_history=loss_history if loss_history else [],
         )
 
         return result
