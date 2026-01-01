@@ -48,8 +48,8 @@ def construct_eval_envs(
         # 各環境に異なるシードを設定
         env_seed = seed + i if seed is not None else None
 
-        # 環境を作成
-        env = gym.make(env_name)
+        # 環境を作成（render_mode='rgb_array'を指定してrender()が使えるようにする）
+        env = gym.make(env_name, render_mode='rgb_array')
 
         # RGB観測ラッパーを適用
         env = RGBImgObsWrapper(env)
