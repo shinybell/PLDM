@@ -12,7 +12,7 @@ from .utils import determine_terminations, calculate_success_rate
 from pldm.models.jepa import JEPA
 from pldm.planning.plotting import log_planning_plots, log_l1_planning_loss
 from pldm.planning.mpc import MPCEvaluator
-from pldm.planning.enums import MPCResult
+from pldm.planning.enums import MPCResult, PooledMPCResult
 from pldm.planning.minigrid.enums import MiniGridMPCConfig, MPCReport
 from pldm.planning import objectives_v2
 from pldm.planning.planners.enums import PlannerType
