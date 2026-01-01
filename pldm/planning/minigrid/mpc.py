@@ -14,6 +14,11 @@ from pldm.planning.plotting import log_planning_plots, log_l1_planning_loss
 from pldm.planning.mpc import MPCEvaluator
 from pldm.planning.enums import PooledMPCResult
 from pldm.planning.minigrid.enums import MiniGridMPCConfig, MPCReport
+from pldm.planning import objectives_v2
+from pldm.planning.planners.enums import PlannerType
+from pldm.planning.planners.mppi_planner import MPPIPlanner
+from pldm.planning.planners.sgd_planner import SGDPlanner
+from pldm.planning.utils import normalize_actions
 
 
 class MiniGridMPCEvaluator(MPCEvaluator):
@@ -63,6 +68,58 @@ class MiniGridMPCEvaluator(MPCEvaluator):
             level=config.level,
             normalizer=self.normalizer,
         )
+
+    def _construct_planner(self, n_envs: int):
+        """
+        MiniGrid用のプランナーを構築
+
+        離散アクション用に action_normalizer を調整
+        """
+        config = self.config
+
+        objective = objectives_v2.ReprTargetMPCObjective(
+            model=self.model,
+            propio_cost=config.level1.propio_cost,
+            sum_all_diffs=config.level1.sum_all_diffs,
+            loss_coeff_first=config.level1.loss_coeff_first,
+            loss_coeff_last=config.level1.loss_coeff_last,
+        )
+
+        # MiniGridは離散アクション（one-hot）なので xy_action=False
+        action_normalizer = lambda x: normalize_actions(
+            x,
+            min_norm=config.level1.min_step,
+            max_norm=config.level1.max_step,
+            xy_action=False,  # MiniGridは離散アクション
+            clamp_actions=config.level1.clamp_actions,
+        )
+
+        if config.level1.planner_type == PlannerType.MPPI:
+            planner = MPPIPlanner(
+                config.level1.mppi,
+                model=self.model,
+                normalizer=self.normalizer,
+                objective=objective,
+                prober=self.prober,
+                action_normalizer=action_normalizer,
+                n_envs=n_envs,
+                projected_cost=config.level1.projected_cost,
+            )
+        elif config.level1.planner_type == PlannerType.SGD:
+            planner = SGDPlanner(
+                config.level1.sgd,
+                model=self.model,
+                normalizer=self.normalizer,
+                objective=objective,
+                prober=self.prober,
+                action_normalizer=action_normalizer,
+            )
+        else:
+            raise NotImplementedError(
+                f"Unknown planner type {config.level1.planner_type}"
+            )
+
+        return planner
 
     def evaluate(self):
         """
@@ -156,3 +213,123 @@ class MiniGridMPCEvaluator(MPCEvaluator):
         )
 
         return report
+
+    def _perform_mpc(self, planner, envs):
+        """
+        MiniGrid用のMPC実行
+
+        MiniGridではゴール位置が環境内に固定されているため、
+        環境からゴール位置を取得して目標とする。
+        """
+        # ゴール位置を取得（MiniGrid環境の内部状態から）
+        targets = []
+        for env in envs:
+            # ラッパーを剥がして元のMiniGrid環境にアクセス
+            unwrapped_env = env
+            while hasattr(unwrapped_env, 'env'):
+                unwrapped_env = unwrapped_env.env
+
+            # ゴール位置を取得
+            goal_pos = unwrapped_env.unwrapped.goal_pos
+            targets.append(np.array(goal_pos, dtype=np.float32))
+
+        targets = torch.from_numpy(np.stack(targets)).to(self.device)
+
+        # 目標の表現を取得（Proberを使用）
+        # MiniGridでは目標観測がないため、目標位置の表現を直接使用
+        # ここでは簡略化のため、目標位置そのものを使用
+        targets_t = targets  # (bs, 2)
+        planner.reset_targets(targets_t, repr_input=False)
+
+        # 初期観測を取得
+        observation_history = []
+        for env in envs:
+            obs, _ = env.reset()
+            observation_history.append(torch.from_numpy(obs).float())
+        observation_history = [torch.stack(observation_history).to(self.device)]
+
+        obs_t = observation_history[0]
+        if self.image_based:
+            obs_t = torch.cat([obs_t] * self.config.stack_states, dim=1)
+
+        action_history = []
+        reward_history = []
+        location_history = []
+        pred_location_history = []
+        loss_history = []
+
+        # エージェントの初期位置を記録
+        initial_locations = []
+        for env in envs:
+            unwrapped_env = env
+            while hasattr(unwrapped_env, 'env'):
+                unwrapped_env = unwrapped_env.env
+            agent_pos = unwrapped_env.unwrapped.agent_pos
+            initial_locations.append(np.array(agent_pos, dtype=np.float32))
+        location_history.append(torch.from_numpy(np.stack(initial_locations)).to(self.device))
+
+        # MPCループ
+        for step in range(self.config.n_steps):
+            # 現在の観測をエンコード
+            if self.normalizer is not None:
+                obs_t_norm = self.normalizer.normalize_states(obs_t)
+            else:
+                obs_t_norm = obs_t
+
+            with torch.no_grad():
+                obs_encoded = self.model.backbone(obs_t_norm).obs_component.detach()
+
+            # プランニング
+            actions, info = planner.plan(obs_encoded)
+
+            # 最初のアクションを実行
+            action = actions[:, 0]  # (bs, action_dim)
+
+            # 離散アクションに変換（one-hotから離散値へ）
+            action_indices = torch.argmax(action, dim=-1).cpu().numpy()
+
+            # 環境でアクションを実行
+            next_obs_list = []
+            rewards = []
+            current_locations = []
+
+            for i, env in enumerate(envs):
+                obs, reward, done, truncated, info_dict = env.step(int(action_indices[i]))
+                next_obs_list.append(torch.from_numpy(obs).float())
+                rewards.append(reward)
+
+                # 現在位置を取得
+                unwrapped_env = env
+                while hasattr(unwrapped_env, 'env'):
+                    unwrapped_env = unwrapped_env.env
+                agent_pos = unwrapped_env.unwrapped.agent_pos
+                current_locations.append(np.array(agent_pos, dtype=np.float32))
+
+            # 記録
+            action_history.append(action.cpu())
+            reward_history.append(torch.tensor(rewards))
+            location_history.append(torch.from_numpy(np.stack(current_locations)).to(self.device))
+
+            if 'pred_locations' in info:
+                pred_location_history.append(info['pred_locations'])
+            if 'loss_history' in info:
+                loss_history.append(info['loss_history'])
+
+            # 次の観測を準備
+            obs_t = torch.stack(next_obs_list).to(self.device)
+            if self.image_based:
+                obs_t = torch.cat([obs_t] * self.config.stack_states, dim=1)
+            observation_history.append(obs_t)
+
+        # 結果をPooledMPCResultにまとめる
+        result = PooledMPCResult(
+            observations=observation_history,
+            locations=location_history,
+            actions=action_history,
+            rewards=reward_history,
+            pred_locations=pred_location_history if pred_location_history else None,
+            targets=targets.cpu(),
+            loss_history=loss_history if loss_history else None,
+        )
+
+        return result
