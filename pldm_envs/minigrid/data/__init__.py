@@ -20,6 +20,7 @@ def minigrid_collate_fn(batch):
     """
     states = torch.stack([sample.states for sample in batch])
     actions = torch.stack([sample.actions for sample in batch])
+    locations = torch.stack([sample.locations for sample in batch])
 
     # rewardsとdonesは全てNoneまたは全て有効値
     if batch[0].rewards is not None:
@@ -35,6 +36,7 @@ def minigrid_collate_fn(batch):
     return MiniGridSample(
         states=states,
         actions=actions,
+        locations=locations,
         rewards=rewards,
         dones=dones,
     )
