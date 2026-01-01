@@ -49,6 +49,8 @@ def calculate_success_rate(locations, targets, error_threshold):
     Returns:
         success_rate: 成功率 [0, 1]
     """
+    locations = locations.cpu()
+    targets = targets.cpu()
     errors = (locations - targets).pow(2).sum(dim=-1).sqrt()
     successes = (errors < error_threshold).float()
     success_rate = successes.mean().item()
