@@ -222,6 +222,7 @@ class Evaluator:
                 prefix=f"minigrid_{level}",
                 quick_debug=self.quick_debug,
                 minigrid_config=dataclasses.replace(self.data_config, train=False),
+                pixel_mapper=self.pixel_mapper,
             )
         else:
             raise NotImplementedError

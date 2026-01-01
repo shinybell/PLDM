@@ -39,6 +39,7 @@ class MiniGridMPCEvaluator(MPCEvaluator):
         minigrid_config: MiniGridDatasetConfig,
         quick_debug: bool = False,
         prefix: str = "",
+        pixel_mapper=None,
     ):
         """
         Args:
@@ -49,6 +50,7 @@ class MiniGridMPCEvaluator(MPCEvaluator):
             minigrid_config: MiniGridデータセット設定
             quick_debug: デバッグモード
             prefix: ログのプレフィックス
+            pixel_mapper: 座標変換用マッパー
         """
         super().__init__(
             config=config,
@@ -57,6 +59,7 @@ class MiniGridMPCEvaluator(MPCEvaluator):
             normalizer=normalizer,
             quick_debug=quick_debug,
             prefix=prefix,
+            pixel_mapper=pixel_mapper,
         )
 
         self.minigrid_config = minigrid_config
@@ -158,6 +161,7 @@ class MiniGridMPCEvaluator(MPCEvaluator):
                 n_steps=self.config.n_steps,
                 xy_action=True,  # MiniGridは離散アクションだが、DotDataset変換を回避するためにTrueにする
                 mark_action=False,  # アクションの矢印表示を無効化（DotDataset依存を回避）
+                pixel_mapper=self.pixel_mapper,
             )
 
         return mpc_data, report
