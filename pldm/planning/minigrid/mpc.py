@@ -336,6 +336,8 @@ class MiniGridMPCEvaluator(MPCEvaluator):
             final_preds_dist=final_preds_dist_history,
             targets=targets.cpu(),
             loss_history=loss_history if loss_history else [],
+            qpos_history=None,  # MiniGridでは使用しない
+            propio_history=None,  # MiniGridでは使用しない
         )
 
         return result
