@@ -77,8 +77,21 @@ class GoalRenderingMixin:
         if target_position is None:
             if hasattr(unwrapped, 'goal_pos'):
                 target_position = unwrapped.goal_pos
+                if target_position is None:
+                    raise ValueError(
+                        f"Environment has goal_pos attribute but it is None. "
+                        f"Environment type: {type(unwrapped)}. "
+                        f"Make sure the environment has been reset."
+                    )
             else:
-                raise ValueError("Environment doesn't have goal_pos and target_position not provided")
+                raise ValueError(
+                    f"Environment doesn't have goal_pos attribute and target_position not provided. "
+                    f"Environment type: {type(unwrapped)}"
+                )
+
+        # Validate target position
+        if target_position is None or (hasattr(target_position, '__len__') and len(target_position) != 2):
+            raise ValueError(f"Invalid target_position: {target_position}")
 
         # Render at target position
         rgb_image = self.render_at_position(target_position, direction)

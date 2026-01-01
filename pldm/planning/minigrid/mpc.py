@@ -235,7 +235,14 @@ class MiniGridMPCEvaluator(MPCEvaluator):
 
         targets = torch.from_numpy(np.stack(targets)).to(self.device)
 
-        # 目標観測を取得
+        # 初期観測を取得（先にリセットして環境を初期化）
+        observation_history = []
+        for env in envs:
+            obs, _ = env.reset()
+            observation_history.append(torch.from_numpy(obs).float())
+        observation_history = [torch.stack(observation_history).to(self.device)]
+
+        # 目標観測を取得（環境がリセットされた後）
         # MiniGridでは、目標位置にエージェントを仮想的に配置してレンダリング
         # DiverseMazeの get_target_obs() と同じアプローチ
         target_obs_list = []
@@ -256,13 +263,6 @@ class MiniGridMPCEvaluator(MPCEvaluator):
 
         # エンコードされた目標表現をプランナーに設定
         planner.reset_targets(target_enc, repr_input=True)
-
-        # 初期観測を取得
-        observation_history = []
-        for env in envs:
-            obs, _ = env.reset()
-            observation_history.append(torch.from_numpy(obs).float())
-        observation_history = [torch.stack(observation_history).to(self.device)]
 
         obs_t = observation_history[0]
         if self.image_based:
