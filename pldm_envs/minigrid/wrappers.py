@@ -33,8 +33,12 @@ class ResizeObservationWrapper(gym.ObservationWrapper):
     def __init__(self, env, size=(64, 64), render_mode='rgb_array'):
         super().__init__(env)
 
-        self.size = size
-        self.height, self.width = size
+        # size can be int or tuple
+        if isinstance(size, int):
+            self.size = (size, size)
+        else:
+            self.size = size
+        self.height, self.width = self.size
 
         # Update observation space to match resized image
         self.observation_space = spaces.Box(
