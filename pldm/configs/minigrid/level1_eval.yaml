@@ -1,5 +1,5 @@
-# MiniGrid Level1 テスト設定
-# 少量データでPLDM学習をテストするための設定
+# MiniGrid Level1 評価設定
+# 学習済みモデルからプロービングとプランニング評価を実行
 
 n_steps: &n_steps 16
 val_n_steps: *n_steps
@@ -7,34 +7,34 @@ env_name: &env_name minigrid_level1
 
 # データ設定
 data:
-  normalize: false # 画像は既にデータセット側で正規化される
+  normalize: false
   min_max_normalize_state: false
   dataset_type: DatasetType.MiniGrid
-  num_workers: 0 # テスト時は0
+  num_workers: 0
   quick_debug: false
 
   minigrid_config:
     # データパス
-    data_path: "data/minigrid/level1_train.npz"
-    val_path: "data/minigrid/level1_val.npz"
+    data_path: "data/minigrid/level1_train_small.npz"
+    val_path: "data/minigrid/level1_val_small.npz"
 
     # データセットパラメータ
     sample_length: *n_steps
     img_size: 72
-    normalize_images: true # [0, 1]に正規化
+    normalize_images: true
 
     # オプション
     include_rewards: false
     include_dones: false
 
     # 訓練パラメータ
-    batch_size: 16 # テスト用に小さめ
-    crop_length: null # 全データを使用
+    batch_size: 16
+    crop_length: null
     train: true
     quick_debug: false
 
-# 訓練設定
-epochs: 3 # テスト用に少なめ
+# 訓練設定（評価のみなので使用されない）
+epochs: 1
 base_lr: 0.001
 optimizer_type: Adam
 
@@ -46,23 +46,21 @@ hjepa:
   l1_n_steps: *n_steps
 
   level1:
-    # バックボーン（画像エンコーダ）
     backbone:
-      arch: impala # IMPALA CNNアーキテクチャ
+      arch: impala
       backbone_subclass: i
       backbone_mlp: null
       backbone_norm: group_norm
       backbone_pool: dim_reduce
       backbone_final_fc: false
-      backbone_width_factor: 1 # IMPALA用は1に設定
-      channels: 3 # RGB画像
+      backbone_width_factor: 1
+      channels: 3
       input_dim: null
       final_ln: true
 
-    # 予測器（動力学モデル）
     predictor:
       predictor_arch: rnnV2
-      predictor_subclass: "512-512"
+      predictor_subclass: '512-512'
       rnn_layers: 1
       z_dim: 0
       z_min_std: 0.1
@@ -70,7 +68,7 @@ hjepa:
       predictor_ln: true
       tie_backbone_ln: true
 
-    action_dim: 7 # MiniGrid: 7つの離散アクション
+    action_dim: 7
     momentum: 0
 
   step_skip: 4
@@ -78,8 +76,8 @@ hjepa:
 # 学習目的関数
 objectives_l1:
   objectives:
-    - VICReg # VICReg損失
-    - IDM # Inverse Dynamics Model
+  - VICReg
+  - IDM
 
   vicreg:
     projector: id
@@ -98,29 +96,30 @@ objectives_l1:
 
   idm:
     coeff: 1.072
-    action_dim: 7 # MiniGrid action dimension
-    arch: "512"
+    action_dim: 7
+    arch: '512'
     arch_subclass: a
     use_pred: false
 
-# チェックポイント
-load_checkpoint_path: null
+# チェックポイント設定
+# IMPORTANT: 学習済みモデルのパスを指定してください
+load_checkpoint_path: "checkpoints/minigrid_level1_test/checkpoint_latest.pt"
 load_l1_only: false
 
 # 評価設定
 eval_at_beginning: false
 eval_during_training: false
-eval_only: false
+eval_only: true  # 評価のみ実行
 
 eval_cfg:
-  env_name: *env_name # minigrid_level1
+  env_name: *env_name
   eval_l1: true
   eval_l2: false
-  disable_planning: false
+  disable_planning: false  # プランニング評価を有効化
 
   # Probing設定
   probing:
-    l1_depth: 8 # Probingで使用するシーケンス長
+    l1_depth: 8
     train_path: null
     val_path: null
     train_images_path: null
@@ -136,7 +135,7 @@ eval_cfg:
     lr: 0.0002
     probe_targets: "locations"
     locations:
-      arch: "512"
+      arch: '512'
       subclass: a
     schedule: Constant
     sample_timesteps: 30
@@ -159,11 +158,11 @@ eval_cfg:
         lr: 0.3
 
 # 出力設定
-output_dir: minigrid_level1_test
+output_dir: minigrid_level1_eval
 output_root: /Users/shunsei/works/MatsuoLab/WorldModel/PLDM/checkpoints
-run_name: minigrid_level1_test
+run_name: minigrid_level1_eval
 run_project: PLDM-MiniGrid
-wandb: false # テスト時はWandB無効
+wandb: false
 
 # その他
 seed: 42

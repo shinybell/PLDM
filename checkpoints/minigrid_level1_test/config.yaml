@@ -199,8 +199,8 @@ data:
     include_rewards: false
     include_dones: false
   minigrid_config:
-    data_path: data/minigrid/level1_train_small.npz
-    val_path: data/minigrid/level1_val_small.npz
+    data_path: data/minigrid/level1_train.npz
+    val_path: data/minigrid/level1_val.npz
     sample_length: 16
     img_size: 72
     normalize_images: true
@@ -325,13 +325,13 @@ hjepa:
 resume_if_possible: true
 compile_model: true
 eval_cfg:
-  env_name: ???
+  env_name: minigrid_level1
   probing:
     probe_targets: locations
     l2_probe_targets: locations
     locations:
-      arch: null
-      subclass: null
+      arch: '512'
+      subclass: a
     propio_pos:
       arch: null
       subclass: null
@@ -339,22 +339,22 @@ eval_cfg:
       arch: null
       subclass: null
     full_finetune: false
-    lr: 0.001
-    epochs: 3
-    epochs_enc: 3
+    lr: 0.0002
+    epochs: 20
+    epochs_enc: 30
     max_samples: null
     max_samples_enc: null
     schedule: Constant
-    sample_timesteps: null
+    sample_timesteps: 30
     prober_arch: ''
     epochs_latent: 5
-    l1_depth: 17
+    l1_depth: 8
     l2_depth: 91
     probe_propio: true
     probe_mpc: false
-    probe_wall: true
+    probe_wall: false
     probe_border: false
-    probe_encoder: true
+    probe_encoder: false
     probe_preds: true
     probe_expert: false
     visualize_probing: true
@@ -370,7 +370,7 @@ eval_cfg:
   log_heatmap: true
   disable_planning: false
   wall_planning:
-    env_name: ???
+    env_name: minigrid_level1
     n_envs: 4
     n_envs_batch_size: 4
     n_steps: 200
@@ -464,7 +464,7 @@ eval_cfg:
     padding: 5
     error_threshold: 1.0
   d4rl_planning:
-    env_name: ???
+    env_name: minigrid_level1
     n_envs: 4
     n_envs_batch_size: 4
     n_steps: 200
@@ -555,3 +555,95 @@ eval_cfg:
     subgoal_planning: false
     set_full_states: false
     unique_shortest_path: false
+  minigrid_planning:
+    env_name: minigrid_level1
+    n_envs: 4
+    n_envs_batch_size: 4
+    n_steps: 200
+    visualize_planning: true
+    level1:
+      planner_type: SGD
+      sgd:
+        n_iters: 100
+        lr: 0.3
+        l2_reg: 0.0
+        action_change_reg: 0.0
+        z_reg_coeff: 0.0
+      mppi:
+        noise_sigma: 5.0
+        num_samples: 500
+        lambda_: 0.005
+        z_reg_coeff: 0.0
+      lfgbs:
+        history_size: 10
+        max_iter: 20
+      clamp_actions: false
+      min_step: 0.1
+      max_step: 1.0
+      repr_target: false
+      loss_coeff_first: 0.1
+      loss_coeff_last: 1.0
+      sum_all_diffs: false
+      min_plan_length: 1
+      max_plan_length: 10
+      depth_probe_threshold: 25
+      probe_depth: false
+      sum_last_n: 3
+      propio_cost: false
+      projected_cost: false
+    plot_failure_only: false
+    log_pred_dist_every: 9223372036854775807
+    plot_every: 16
+    data_path: ''
+    action_repeat: 1
+    action_repeat_mode: 'null'
+    img_size: 64
+    replan_every: 1
+    image_obs: false
+    stack_states: 1
+    random_actions: false
+    offline_T: 10
+    start_target_from_data: false
+    set_start_target_path: null
+    levels: level1
+    easy:
+      n_steps: 30
+      n_envs: 4
+      max_plan_length: 10
+      offline_T: 10
+      plot_every: 2
+      override_config: false
+      min_block_radius: -1
+      max_block_radius: 9223372036854775807
+    medium:
+      n_steps: 30
+      n_envs: 4
+      max_plan_length: 10
+      offline_T: 10
+      plot_every: 2
+      override_config: false
+      min_block_radius: -1
+      max_block_radius: 9223372036854775807
+    hard:
+      n_steps: 30
+      n_envs: 4
+      max_plan_length: 10
+      offline_T: 10
+      plot_every: 2
+      override_config: false
+      min_block_radius: -1
+      max_block_radius: 9223372036854775807
+    ogbench:
+      n_steps: 30
+      n_envs: 4
+      max_plan_length: 10
+      offline_T: 10
+      plot_every: 2
+      override_config: false
+      min_block_radius: -1
+      max_block_radius: 9223372036854775807
+    discount: 1.0
+    level: level1
+    seed: 42
+    error_threshold: 1.0
+    max_episode_steps: 1000

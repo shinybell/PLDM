@@ -137,9 +137,11 @@ class Evaluator:
     def _create_l1_planning_evaluator(
         self,
         level: str,
-        level_config: LevelConfig,
+        level_config,  # Can be LevelConfig or PlannerConfig
     ):
-        if level_config.override_config:
+        # For LevelConfig (Wall), check override_config
+        # For PlannerConfig (MiniGrid), use default values
+        if hasattr(level_config, 'override_config') and level_config.override_config:
             max_plan_length = level_config.max_plan_length
             n_envs = level_config.n_envs
             n_steps = level_config.n_steps
