@@ -303,7 +303,12 @@ class MiniGridMPCEvaluator(MPCEvaluator):
                 obs_encoded = self.model.backbone(obs_t_norm).obs_component.detach()
 
             # プランニング
-            actions, info = planner.plan(obs_encoded)
+            # plan_sizeは残りステップ数とmax_plan_lengthの小さい方
+            plan_size = min(
+                self.config.n_steps - step,
+                self.config.level1.max_plan_length
+            )
+            actions, info = planner.plan(obs_encoded, plan_size=plan_size)
 
             # 最初のアクションを実行
             action = actions[:, 0]  # (bs, action_dim)
