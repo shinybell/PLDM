@@ -265,7 +265,7 @@ class DatasetFactory:
         MiniGridデータセットを作成
 
         Returns:
-            Datasets: 訓練データセット、検証データセット（オプション）
+            Datasets: 訓練データセット、検証データセット、Probingデータセット（オプション）
         """
         # 訓練データセット
         ds = MiniGridDataset(self.config.minigrid_config)
@@ -295,9 +295,71 @@ class DatasetFactory:
                 collate_fn=minigrid_collate_fn,
             )
 
+        # Probingデータセット（検証データが存在し、probing設定が有効な場合）
+        probing_datasets = None
+        if (
+            self.config.minigrid_config.val_path is not None
+            and self.probing_cfg is not None
+        ):
+            probing_datasets = self._create_minigrid_probing_datasets(
+                normalizer=ds.normalizer
+            )
+
         datasets = Datasets(
             ds=ds,
             val_ds=val_ds,
+            probing_datasets=probing_datasets,
         )
 
         return datasets
+
+    def _create_minigrid_probing_datasets(self, normalizer: Normalizer):
+        """
+        MiniGrid用のProbingデータセットを作成
+
+        Args:
+            normalizer: 訓練データセットから作成されたNormalizer
+
+        Returns:
+            ProbingDatasets: Probing用の訓練・検証データセット
+        """
+        # Probing訓練データセット
+        probe_ds = MiniGridDataset(
+            dataclasses.replace(
+                self.config.minigrid_config,
+                # Probingではより短いシーケンスを使用
+                sample_length=self.probing_cfg.l1_depth,
+                train=True,
+            )
+        )
+        probe_ds = make_dataloader(
+            ds=probe_ds,
+            loader_config=self.config,
+            normalizer=normalizer,
+            suffix="probe_train",
+            collate_fn=minigrid_collate_fn,
+        )
+
+        # Probing検証データセット
+        probe_val_ds = MiniGridDataset(
+            dataclasses.replace(
+                self.config.minigrid_config,
+                data_path=self.config.minigrid_config.val_path,
+                sample_length=self.probing_cfg.l1_depth,
+                train=False,
+                batch_size=64,
+                crop_length=50000 if self.config.minigrid_config.crop_length is None else self.config.minigrid_config.crop_length,
+            ),
+        )
+
+        probe_val_ds = make_dataloader(
+            ds=probe_val_ds,
+            loader_config=self.config,
+            normalizer=normalizer,
+            suffix="probe_val",
+            collate_fn=minigrid_collate_fn,
+        )
+
+        probing_datasets = ProbingDatasets(ds=probe_ds, val_ds=probe_val_ds)
+
+        return probing_datasets

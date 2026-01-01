@@ -8,8 +8,10 @@ from pldm.probing.evaluator import ProbingConfig, ProbingEvaluator
 from pldm.planning.wall.enums import WallMPCConfig
 from pldm.data.enums import ProbingDatasets, DatasetType
 from pldm.planning.d4rl.enums import D4RLMPCConfig
+from pldm.planning.minigrid.enums import MiniGridMPCConfig
 from pldm.planning.enums import LevelConfig
 from pldm.planning.wall.mpc import WallMPCEvaluator
+from pldm.planning.minigrid.mpc import MiniGridMPCEvaluator
 from omegaconf import MISSING
 
 from pldm_envs.utils.normalizer import Normalizer
@@ -27,10 +29,12 @@ class EvalConfig(ConfigBase):
     disable_planning: bool = False
     wall_planning: WallMPCConfig = field(default_factory=WallMPCConfig)
     d4rl_planning: D4RLMPCConfig = field(default_factory=D4RLMPCConfig)
+    minigrid_planning: MiniGridMPCConfig = field(default_factory=MiniGridMPCConfig)
 
     def __post_init__(self):
         self.wall_planning.env_name = self.env_name
         self.d4rl_planning.env_name = self.env_name
+        self.minigrid_planning.env_name = self.env_name
 
 
 class Evaluator:
@@ -78,8 +82,7 @@ class Evaluator:
         elif self.config.env_name == "wall":
             config = self.config.wall_planning
         elif "minigrid" in self.config.env_name:
-            # MiniGridではplanningは未実装
-            config = None
+            config = self.config.minigrid_planning
         else:
             raise NotImplementedError
         return config
@@ -189,6 +192,16 @@ class Evaluator:
                 prefix=f"wall_{level}",
                 quick_debug=self.quick_debug,
                 wall_config=dataclasses.replace(self.data_config, train=False),
+            )
+        elif "minigrid" in self.config.env_name:
+            planning_evaluator = MiniGridMPCEvaluator(
+                config=mpc_config,
+                normalizer=self.normalizer,
+                jepa=self.model.level1,
+                prober=self.probers["locations"],
+                prefix=f"minigrid_{level}",
+                quick_debug=self.quick_debug,
+                minigrid_config=dataclasses.replace(self.data_config.minigrid_config, train=False),
             )
         else:
             raise NotImplementedError

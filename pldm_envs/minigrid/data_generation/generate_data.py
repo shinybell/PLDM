@@ -63,14 +63,20 @@ def generate_episode(env, policy, max_steps=1000, seed=None):
             - actions: [T-1]
             - rewards: [T-1]
             - dones: [T-1]
+            - positions: [T, 2] - エージェント位置 (x, y)
     """
     obs_list = []
     action_list = []
     reward_list = []
     done_list = []
+    position_list = []
 
     obs, info = env.reset(seed=seed)
     obs_list.append(obs)
+
+    # エージェント位置を取得（MiniGrid環境から）
+    agent_pos = env.unwrapped.agent_pos
+    position_list.append(agent_pos.copy())
 
     for step in range(max_steps):
         action = policy(obs)
@@ -81,6 +87,10 @@ def generate_episode(env, policy, max_steps=1000, seed=None):
         reward_list.append(reward)
         done_list.append(terminated or truncated)
 
+        # エージェント位置を取得
+        agent_pos = env.unwrapped.agent_pos
+        position_list.append(agent_pos.copy())
+
         if terminated or truncated:
             break
 
@@ -89,6 +99,7 @@ def generate_episode(env, policy, max_steps=1000, seed=None):
         "actions": np.array(action_list),
         "rewards": np.array(reward_list),
         "dones": np.array(done_list),
+        "positions": np.array(position_list, dtype=np.float32),
     }
 
 
@@ -204,11 +215,20 @@ def pad_episode(episode, target_length):
             axis=0,
         )
 
+        padded_positions = np.concatenate(
+            [
+                episode["positions"],
+                np.tile(episode["positions"][-1:], (pad_length, 1)),  # 最終位置で埋める
+            ],
+            axis=0,
+        )
+
         return {
             "observations": padded_obs,
             "actions": padded_actions,
             "rewards": padded_rewards,
             "dones": padded_dones,
+            "positions": padded_positions,
         }
 
 
@@ -365,6 +385,7 @@ def main():
         actions = np.array([ep["actions"] for ep in all_episodes])
         rewards = np.array([ep["rewards"] for ep in all_episodes])
         dones = np.array([ep["dones"] for ep in all_episodes])
+        positions = np.array([ep["positions"] for ep in all_episodes])
     else:
         # 可変長: object配列
         observations = np.array(
@@ -373,6 +394,7 @@ def main():
         actions = np.array([ep["actions"] for ep in all_episodes], dtype=object)
         rewards = np.array([ep["rewards"] for ep in all_episodes], dtype=object)
         dones = np.array([ep["dones"] for ep in all_episodes], dtype=object)
+        positions = np.array([ep["positions"] for ep in all_episodes], dtype=object)
 
     # 保存
     print(f"\nSaving data to {args.output_path}...")
@@ -382,6 +404,7 @@ def main():
         actions=actions,
         rewards=rewards,
         dones=dones,
+        positions=positions,
     )
 
     # ファイルサイズ
@@ -394,6 +417,7 @@ def main():
     print(f"  Actions: {actions.shape}")
     print(f"  Rewards: {rewards.shape}")
     print(f"  Dones: {dones.shape}")
+    print(f"  Positions: {positions.shape}")
 
     if args.pad_length is not None and len(all_episodes) > 0:
         print(f"\nSample episode shapes (after padding):")

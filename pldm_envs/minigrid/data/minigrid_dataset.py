@@ -24,12 +24,14 @@ class MiniGridSample(NamedTuple):
 
     Attributes:
         states: 観測画像 [T, C, H, W] torch.Tensor (float32)
-        actions: アクション [T-1, 1] torch.Tensor (long)
+        actions: アクション [T-1, NUM_ACTIONS] torch.Tensor (float32) - one-hot
+        locations: エージェント位置 [T, 2] torch.Tensor (float32) - (x, y)座標
         rewards: 報酬 [T-1] torch.Tensor (float32) - オプション
         dones: 終端フラグ [T-1] torch.Tensor (bool) - オプション
     """
     states: torch.Tensor
     actions: torch.Tensor
+    locations: torch.Tensor
     rewards: Optional[torch.Tensor] = None
     dones: Optional[torch.Tensor] = None
 
@@ -135,6 +137,17 @@ class MiniGridDataset(torch.utils.data.Dataset):
         # actions: [N_episodes, T-1] int
         self.actions = data['actions']
 
+        # locations: [N_episodes, T, 2] float32 - エージェント位置 (x, y)
+        if 'positions' in data:
+            self.locations = data['positions']
+        elif 'locations' in data:
+            self.locations = data['locations']
+        else:
+            raise ValueError(
+                "Dataset must contain 'positions' or 'locations' field. "
+                "Please regenerate the dataset with position information."
+            )
+
         # 報酬（オプション）
         if 'rewards' in data and self.config.include_rewards:
             self.rewards = data['rewards']
@@ -149,6 +162,7 @@ class MiniGridDataset(torch.utils.data.Dataset):
 
         print(f"  Observations: {self.observations.shape} {self.observations.dtype}")
         print(f"  Actions: {self.actions.shape} {self.actions.dtype}")
+        print(f"  Locations: {self.locations.shape} {self.locations.dtype}")
 
         # スライディングウィンドウの設定
         self._setup_slicing()
@@ -256,6 +270,7 @@ class MiniGridDataset(torch.utils.data.Dataset):
         # データの取得
         obs = self.observations[episode_idx, slice_start:slice_end]  # [T, H, W, C]
         actions = self.actions[episode_idx, slice_start:slice_end-1]  # [T-1]
+        locations = self.locations[episode_idx, slice_start:slice_end]  # [T, 2]
 
         # 画像の前処理
         obs = self._preprocess_observations(obs)
@@ -265,6 +280,7 @@ class MiniGridDataset(torch.utils.data.Dataset):
         actions_indices = torch.from_numpy(actions).long()  # [T-1]
         # One-hotエンコーディング: [T-1] -> [T-1, NUM_ACTIONS]
         actions = F.one_hot(actions_indices, num_classes=MINIGRID_NUM_ACTIONS).float()
+        locations = torch.from_numpy(np.array(locations)).float()  # [T, 2]
 
         # 報酬の取得（オプション）
         if self.rewards is not None:
@@ -285,6 +301,7 @@ class MiniGridDataset(torch.utils.data.Dataset):
         sample = MiniGridSample(
             states=states,
             actions=actions,
+            locations=locations,
             rewards=rewards,
             dones=dones,
         )
@@ -314,10 +331,12 @@ class MiniGridDataset(torch.utils.data.Dataset):
         # データの取得 (object配列から取り出す)
         obs = self.observations[episode_idx][slice_start:slice_end]  # [T, H, W, C]
         actions = self.actions[episode_idx][slice_start:slice_end-1]  # [T-1]
+        locations = self.locations[episode_idx][slice_start:slice_end]  # [T, 2]
 
         # numpy配列に変換（明示的にdtypeを指定）
         obs = np.array(obs, dtype=np.uint8)
         actions = np.array(actions, dtype=np.int64)
+        locations = np.array(locations, dtype=np.float32)
 
         # 画像の前処理
         obs = self._preprocess_observations(obs)
@@ -327,6 +346,7 @@ class MiniGridDataset(torch.utils.data.Dataset):
         actions_indices = torch.from_numpy(actions).long()  # [T-1]
         # One-hotエンコーディング: [T-1] -> [T-1, NUM_ACTIONS]
         actions = F.one_hot(actions_indices, num_classes=MINIGRID_NUM_ACTIONS).float()
+        locations = torch.from_numpy(locations).float()  # [T, 2]
 
         # 報酬とdones（オプション）
         rewards = None
@@ -341,6 +361,7 @@ class MiniGridDataset(torch.utils.data.Dataset):
         sample = MiniGridSample(
             states=states,
             actions=actions,
+            locations=locations,
             rewards=rewards,
             dones=dones,
         )

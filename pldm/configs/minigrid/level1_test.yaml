@@ -118,6 +118,35 @@ eval_cfg:
   eval_l2: false
   disable_planning: false
 
+  # Probing設定
+  probing:
+    l1_depth: 8  # Probingで使用するシーケンス長
+    train_path: null
+    val_path: null
+    train_images_path: null
+    val_images_path: null
+    probe_wall: false
+    probe_border: false
+    probe_encoder: false
+
+  # MiniGrid Planning設定
+  minigrid_planning:
+    n_envs: 4
+    n_steps: 200
+    visualize_planning: true
+    level: level1
+    seed: 42
+    error_threshold: 1.0
+    max_episode_steps: 1000
+    levels: "easy"
+
+    easy:
+      n_steps: 200
+      n_envs: 4
+      max_plan_length: 10
+      offline_T: 10
+      plot_every: 2
+
 # 出力設定
 output_dir: minigrid_level1_test
 output_root: /Users/shunsei/works/MatsuoLab/WorldModel/PLDM/checkpoints
