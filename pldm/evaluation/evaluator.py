@@ -123,22 +123,48 @@ class Evaluator:
             pixel_mapper = D4RLPixelMapper(env_name=self.config.env_name)
         elif "minigrid" in self.config.env_name:
             class MiniGridPixelMapper:
-                def __init__(self, img_size, grid_size=19):
+                def __init__(self, img_size, grid_width=24, grid_height=24):
                     self.img_size = img_size
-                    self.grid_size = grid_size
-                    self.scale = img_size / grid_size
+                    self.grid_width = grid_width
+                    self.grid_height = grid_height
+                    self.scale_x = img_size / grid_width
+                    self.scale_y = img_size / grid_height
 
                 def obs_coord_to_pixel_coord(self, x):
-                    return x * self.scale
+                    # x is (batch, 2) or (2,)
+                    # x[..., 0] is col (width), x[..., 1] is row (height)
+                    if isinstance(x, torch.Tensor):
+                        x_new = x.clone()
+                        x_new[..., 0] = x[..., 0] * self.scale_x
+                        x_new[..., 1] = x[..., 1] * self.scale_y
+                        return x_new
+                    else:
+                        # assume numpy or list
+                        return [x[0] * self.scale_x, x[1] * self.scale_y]
 
                 def pixel_coord_to_obs_coord(self, x):
-                    return x / self.scale
+                    if isinstance(x, torch.Tensor):
+                        x_new = x.clone()
+                        x_new[..., 0] = x[..., 0] / self.scale_x
+                        x_new[..., 1] = x[..., 1] / self.scale_y
+                        return x_new
+                    else:
+                        return [x[0] / self.scale_x, x[1] / self.scale_y]
 
             img_size = 64  # Default
             if hasattr(self.data_config, "img_size"):
                 img_size = self.data_config.img_size
             
-            pixel_mapper = MiniGridPixelMapper(img_size=img_size)
+            grid_width = 24
+            grid_height = 24
+            
+            # Try to infer from planning config
+            if hasattr(self, "planning_config") and hasattr(self.planning_config, "level"):
+                if self.planning_config.level in ["level1", "level2", "level3"]:
+                    grid_width = 24
+                    grid_height = 24
+            
+            pixel_mapper = MiniGridPixelMapper(img_size=img_size, grid_width=grid_width, grid_height=grid_height)
         else:
 
             class IdPixelMapper:
