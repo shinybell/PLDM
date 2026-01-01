@@ -1,8 +1,8 @@
 """MiniGrid Planning Configuration and Report Types"""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, NamedTuple
 import torch
-from pldm.planning.enums import MPCConfig, LevelConfig
+from pldm.planning.enums import MPCConfig
 
 
 @dataclass
@@ -22,11 +22,6 @@ class MiniGridMPCConfig(MPCConfig):
     seed: Optional[int] = 42
     error_threshold: float = 1.0
     max_episode_steps: int = 1000
-
-    # 環境レベル別の設定
-    level1: LevelConfig = field(default_factory=LevelConfig)
-    level2: LevelConfig = field(default_factory=LevelConfig)
-    level3: LevelConfig = field(default_factory=LevelConfig)
 
 
 class MPCReport(NamedTuple):

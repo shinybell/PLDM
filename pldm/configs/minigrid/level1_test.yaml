@@ -153,11 +153,10 @@ eval_cfg:
     levels: "level1"
 
     level1:
-      n_steps: 200
-      n_envs: 4
+      planner_type: PlannerType.SGD
       max_plan_length: 10
-      offline_T: 10
-      plot_every: 2
+      sgd:
+        lr: 0.3
 
 # 出力設定
 output_dir: minigrid_level1_test
