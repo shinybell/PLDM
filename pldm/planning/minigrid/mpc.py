@@ -235,11 +235,27 @@ class MiniGridMPCEvaluator(MPCEvaluator):
 
         targets = torch.from_numpy(np.stack(targets)).to(self.device)
 
-        # 目標の表現を取得（Proberを使用）
-        # MiniGridでは目標観測がないため、目標位置の表現を直接使用
-        # ここでは簡略化のため、目標位置そのものを使用
-        targets_t = targets  # (bs, 2)
-        planner.reset_targets(targets_t, repr_input=False)
+        # 目標観測を取得
+        # MiniGridでは、目標位置にエージェントを仮想的に配置してレンダリング
+        # DiverseMazeの get_target_obs() と同じアプローチ
+        target_obs_list = []
+        for i, env in enumerate(envs):
+            # 環境のget_target_obs()を使って目標位置での観測を取得
+            target_obs = env.get_target_obs()  # (H, W, 3) uint8
+            target_obs_list.append(torch.from_numpy(target_obs).float())
+
+        target_obs_batch = torch.stack(target_obs_list).to(self.device)  # (bs, H, W, 3)
+
+        # 正規化
+        if self.normalizer is not None:
+            target_obs_batch = self.normalizer.normalize_states(target_obs_batch)
+
+        # バックボーンで目標観測をエンコード
+        with torch.no_grad():
+            target_enc = self.model.backbone(target_obs_batch).obs_component.detach()
+
+        # エンコードされた目標表現をプランナーに設定
+        planner.reset_targets(target_enc, repr_input=True)
 
         # 初期観測を取得
         observation_history = []

@@ -9,9 +9,80 @@ import numpy as np
 from PIL import Image
 import gymnasium as gym
 from gymnasium import spaces
+import copy
 
 
-class ResizeObservationWrapper(gym.ObservationWrapper):
+class GoalRenderingMixin:
+    """
+    Mixin that adds goal rendering capability to MiniGrid wrappers.
+
+    This allows rendering what the environment would look like if the agent
+    were at the goal position, similar to DiverseMaze's get_target_obs().
+    """
+
+    def render_at_position(self, position, direction=None):
+        """
+        Render the environment with the agent at a specific position.
+
+        Args:
+            position: (x, y) tuple/array of grid position
+            direction: Agent direction (0-3). If None, uses current direction.
+
+        Returns:
+            RGB image array of shape (H, W, 3)
+        """
+        # Get unwrapped environment
+        unwrapped = self.unwrapped
+
+        # Save current agent state
+        original_pos = unwrapped.agent_pos.copy()
+        original_dir = unwrapped.agent_dir
+
+        # Set agent to target position
+        unwrapped.agent_pos = np.array(position, dtype=np.int32)
+        if direction is not None:
+            unwrapped.agent_dir = direction
+
+        # Render at this position
+        rgb_image = unwrapped.render()
+
+        # Restore original agent state
+        unwrapped.agent_pos = original_pos
+        unwrapped.agent_dir = original_dir
+
+        return rgb_image
+
+    def get_target_obs(self, target_position=None, direction=None):
+        """
+        Get observation at the target/goal position.
+
+        Args:
+            target_position: (x, y) tuple/array. If None, uses env's goal_pos.
+            direction: Agent direction. If None, uses current direction.
+
+        Returns:
+            Observation (RGB image) at the target position, processed through
+            all observation wrappers.
+        """
+        # Get unwrapped environment
+        unwrapped = self.unwrapped
+
+        # Use environment's goal position if not specified
+        if target_position is None:
+            if hasattr(unwrapped, 'goal_pos'):
+                target_position = unwrapped.goal_pos
+            else:
+                raise ValueError("Environment doesn't have goal_pos and target_position not provided")
+
+        # Render at target position
+        rgb_image = self.render_at_position(target_position, direction)
+
+        # Apply observation transformations (resize, etc.)
+        # This processes the raw RGB through the observation wrappers
+        return self.observation(rgb_image)
+
+
+class ResizeObservationWrapper(gym.ObservationWrapper, GoalRenderingMixin):
     """
     Wrapper that resizes RGB observations to a specified size.
 
