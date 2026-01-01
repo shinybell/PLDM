@@ -53,14 +53,22 @@ class ResizeObservationWrapper(gym.ObservationWrapper):
         Transform the observation by resizing.
 
         Args:
-            observation: RGB image observation from the environment (H, W, 3)
+            observation: RGB image observation from the environment
+                        Can be either:
+                        - numpy array of shape (H, W, 3)
+                        - dict with 'image' key containing the RGB array
 
         Returns:
             Resized RGB image of shape (height, width, 3)
         """
-        # observation is already an RGB image from RGBImgObsWrapper
+        # Extract image from observation (handle both dict and array cases)
+        if isinstance(observation, dict):
+            rgb_image = observation['image']
+        else:
+            rgb_image = observation
+
         # Resize using PIL (high quality)
-        pil_image = Image.fromarray(observation)
+        pil_image = Image.fromarray(rgb_image)
         resized_pil = pil_image.resize((self.width, self.height), Image.Resampling.LANCZOS)
         resized_image = np.array(resized_pil)
 
