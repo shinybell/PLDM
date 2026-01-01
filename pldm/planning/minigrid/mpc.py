@@ -280,10 +280,10 @@ class MiniGridMPCEvaluator(MPCEvaluator):
                 self.config.level1.max_plan_length
             )
             # プランナーには生の観測を渡す（プランナー内部でエンコードされる）
-            actions, info = planner.plan(obs_t, plan_size=plan_size, repr_input=False)
+            planning_result = planner.plan(obs_t, plan_size=plan_size, repr_input=False)
 
             # 最初のアクションを実行
-            action = actions[:, 0]  # (bs, action_dim)
+            action = planning_result.actions[:, 0]  # (bs, action_dim)
 
             # 離散アクションに変換（one-hotから離散値へ）
             action_indices = torch.argmax(action, dim=-1).cpu().numpy()
@@ -308,10 +308,10 @@ class MiniGridMPCEvaluator(MPCEvaluator):
             reward_history.append(torch.tensor(rewards))
             location_history.append(torch.from_numpy(np.stack(current_locations)).to(self.device))
 
-            if 'pred_locations' in info:
-                pred_location_history.append(info['pred_locations'])
-            if 'loss_history' in info:
-                loss_history.append(info['loss_history'])
+            if planning_result.locations is not None:
+                pred_location_history.append(planning_result.locations)
+            if planning_result.losses is not None:
+                loss_history.append(planning_result.losses)
 
             # 次の観測を取得（DiverseMazeと同じアプローチ）
             obs_t = torch.stack([e.get_obs() for e in envs])
