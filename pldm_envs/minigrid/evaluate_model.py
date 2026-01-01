@@ -39,7 +39,15 @@ def load_model(checkpoint_path: str, config_path: str = None):
     # 設定をロード（チェックポイントまたは設定ファイルから）
     if config_path:
         from omegaconf import OmegaConf
-        config_dict = OmegaConf.load(config_path)
+        from pldm.models.hjepa import HJEPAConfig
+        from pldm.models.encoders.enums import BackboneConfig
+        from pldm.models.enums import PredictorConfig
+
+        # データクラスの構造を使ってデフォルト値を含む設定を作成
+        hjepa_structured = OmegaConf.structured(HJEPAConfig)
+        yaml_config = OmegaConf.load(config_path)
+        # YAMLの設定とマージ（YAMLに無いフィールドはデフォルト値が使われる）
+        config_dict = OmegaConf.merge(hjepa_structured, yaml_config)
     elif 'config' in checkpoint:
         # チェックポイントに設定が含まれている場合
         config = checkpoint['config']
