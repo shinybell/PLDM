@@ -255,7 +255,7 @@ class MiniGridMPCEvaluator(MPCEvaluator):
 
         # 正規化
         if self.normalizer is not None:
-            target_obs_batch = self.normalizer.normalize_states(target_obs_batch)
+            target_obs_batch = self.normalizer.normalize_state(target_obs_batch)
 
         # バックボーンで目標観測をエンコード
         with torch.no_grad():
@@ -288,7 +288,7 @@ class MiniGridMPCEvaluator(MPCEvaluator):
         for step in range(self.config.n_steps):
             # 現在の観測をエンコード
             if self.normalizer is not None:
-                obs_t_norm = self.normalizer.normalize_states(obs_t)
+                obs_t_norm = self.normalizer.normalize_state(obs_t)
             else:
                 obs_t_norm = obs_t
 
