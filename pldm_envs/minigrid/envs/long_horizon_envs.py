@@ -241,8 +241,9 @@ class CustomMapEnv(MiniGridEnv):
                 max_distance=self.max_distance,
             )
 
-            # Place goal
+            # Place goal and store position
             self.put_obj(Goal(), *goal_pos)
+            self.goal_pos = goal_pos  # Store goal position for MPC
 
             # Place agent
             self.agent_pos = start_pos
@@ -261,6 +262,7 @@ class CustomMapEnv(MiniGridEnv):
                     for x in range(width - 2, 0, -1):
                         if self.map_array[y, x] == 0:
                             self.put_obj(Goal(), x, y)
+                            self.goal_pos = (x, y)  # Store goal position for MPC
                             break
                     else:
                         continue
