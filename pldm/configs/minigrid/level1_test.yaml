@@ -128,6 +128,18 @@ eval_cfg:
     probe_wall: false
     probe_border: false
     probe_encoder: false
+    visualize_probing: true
+    probe_mpc: false
+    epochs: 20
+    epochs_enc: 30
+    full_finetune: false
+    lr: 0.0002
+    probe_targets: "locations"
+    locations:
+      arch: '512'
+      subclass: a
+    schedule: Constant
+    sample_timesteps: 30
 
   # MiniGrid Planning設定
   minigrid_planning:

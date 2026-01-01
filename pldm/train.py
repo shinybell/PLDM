@@ -499,6 +499,18 @@ class Trainer:
         self.eval_on_objectives()
 
         # create evaluator (for both probing and planning)
+        # 環境に応じた適切なdata_configを選択
+        if "wall" in self.config.env_name:
+            env_data_config = self.config.data.wall_config
+        elif "d4rl" in self.config.env_name or "maze" in self.config.env_name:
+            env_data_config = self.config.data.d4rl_config
+        elif "minigrid" in self.config.env_name:
+            env_data_config = self.config.data.minigrid_config
+        elif "atari" in self.config.env_name:
+            env_data_config = self.config.data.atari_config
+        else:
+            env_data_config = self.config.data.wall_config  # fallback
+
         self.evaluator = Evaluator(
             config=self.config.eval_cfg,
             model=self.model,
@@ -509,7 +521,7 @@ class Trainer:
             l2_probing_datasets=self.datasets.l2_probing_datasets,
             load_checkpoint_path=self.config.load_checkpoint_path,
             output_path=self.config.output_path,
-            data_config=self.config.data.wall_config,  # TODO: refactor name to data_config
+            data_config=env_data_config,
         )
 
         log_dict = self.evaluator.evaluate()
