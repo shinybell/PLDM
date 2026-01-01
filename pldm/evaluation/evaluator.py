@@ -201,7 +201,7 @@ class Evaluator:
                 prober=self.probers["locations"],
                 prefix=f"minigrid_{level}",
                 quick_debug=self.quick_debug,
-                minigrid_config=dataclasses.replace(self.data_config.minigrid_config, train=False),
+                minigrid_config=dataclasses.replace(self.data_config, train=False),
             )
         else:
             raise NotImplementedError
