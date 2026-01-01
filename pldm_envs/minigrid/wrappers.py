@@ -48,10 +48,6 @@ class ResizeObservationWrapper(gym.ObservationWrapper):
             dtype=np.uint8
         )
 
-        # Set render mode if needed
-        if hasattr(env, 'render_mode') and env.render_mode != render_mode:
-            env.render_mode = render_mode
-
     def observation(self, observation):
         """
         Transform the observation by rendering and resizing.
