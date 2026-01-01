@@ -156,7 +156,7 @@ class MiniGridMPCEvaluator(MPCEvaluator):
                 ),
                 prefix=self.prefix,
                 n_steps=self.config.n_steps,
-                xy_action=False,  # MiniGridは離散アクション
+                xy_action=True,  # MiniGridは離散アクションだが、DotDataset変換を回避するためにTrueにする
                 mark_action=False,  # アクションの矢印表示を無効化（DotDataset依存を回避）
             )
 
