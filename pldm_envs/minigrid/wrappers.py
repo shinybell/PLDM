@@ -50,19 +50,17 @@ class ResizeObservationWrapper(gym.ObservationWrapper):
 
     def observation(self, observation):
         """
-        Transform the observation by rendering and resizing.
+        Transform the observation by resizing.
 
         Args:
-            observation: The original observation from the environment (not used)
+            observation: RGB image observation from the environment (H, W, 3)
 
         Returns:
             Resized RGB image of shape (height, width, 3)
         """
-        # Get RGB rendering from environment
-        rgb_image = self.env.render()
-
+        # observation is already an RGB image from RGBImgObsWrapper
         # Resize using PIL (high quality)
-        pil_image = Image.fromarray(rgb_image)
+        pil_image = Image.fromarray(observation)
         resized_pil = pil_image.resize((self.width, self.height), Image.Resampling.LANCZOS)
         resized_image = np.array(resized_pil)
 
