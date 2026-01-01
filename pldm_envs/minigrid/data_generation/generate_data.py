@@ -76,7 +76,8 @@ def generate_episode(env, policy, max_steps=1000, seed=None):
 
     # エージェント位置を取得（MiniGrid環境から）
     agent_pos = env.unwrapped.agent_pos
-    position_list.append(agent_pos.copy())
+    # agent_posはtupleなのでnumpy配列に変換
+    position_list.append(np.array(agent_pos, dtype=np.float32))
 
     for step in range(max_steps):
         action = policy(obs)
@@ -89,7 +90,7 @@ def generate_episode(env, policy, max_steps=1000, seed=None):
 
         # エージェント位置を取得
         agent_pos = env.unwrapped.agent_pos
-        position_list.append(agent_pos.copy())
+        position_list.append(np.array(agent_pos, dtype=np.float32))
 
         if terminated or truncated:
             break
