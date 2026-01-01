@@ -58,13 +58,14 @@ class GoalRenderingMixin:
 
         return rgb_image
 
-    def get_target_obs(self, target_position=None, direction=None):
+    def get_target_obs(self, target_position=None, direction=None, as_tensor=False):
         """
         Get observation at the target/goal position.
 
         Args:
             target_position: (x, y) tuple/array. If None, uses env's goal_pos.
             direction: Agent direction. If None, uses current direction.
+            as_tensor: If True, return torch.Tensor of shape (3, H, W). Otherwise return numpy array.
 
         Returns:
             Observation (RGB image) at the target position, processed through
@@ -98,7 +99,15 @@ class GoalRenderingMixin:
 
         # Apply observation transformations (resize, etc.)
         # This processes the raw RGB through the observation wrappers
-        return self.observation(rgb_image)
+        obs = self.observation(rgb_image)
+
+        if as_tensor:
+            import torch
+            obs_tensor = torch.from_numpy(obs).float()
+            obs_tensor = obs_tensor.permute(2, 0, 1)  # (H, W, 3) -> (3, H, W)
+            return obs_tensor
+        else:
+            return obs
 
 
 class ResizeObservationWrapper(gym.ObservationWrapper, GoalRenderingMixin):
@@ -129,6 +138,9 @@ class ResizeObservationWrapper(gym.ObservationWrapper, GoalRenderingMixin):
         else:
             self.size = size
         self.height, self.width = self.size
+
+        # Store current observation for get_obs()
+        self._current_obs = None
 
         # Update observation space to match resized image
         self.observation_space = spaces.Box(
@@ -162,7 +174,35 @@ class ResizeObservationWrapper(gym.ObservationWrapper, GoalRenderingMixin):
         resized_pil = pil_image.resize((self.width, self.height), Image.Resampling.LANCZOS)
         resized_image = np.array(resized_pil)
 
+        # Store for get_obs()
+        self._current_obs = resized_image
+
         return resized_image
+
+    def get_obs(self):
+        """
+        Get current observation as a torch tensor.
+
+        This method is called by the MPC planner to get the current observation.
+        Similar to DiverseMaze's get_obs() method.
+
+        Returns:
+            torch.Tensor: Current observation of shape (3, H, W) as float32
+        """
+        import torch
+
+        if self._current_obs is None:
+            # If no observation is cached, get one from the environment
+            obs, _ = self.env.reset()
+            obs = self.observation(obs)
+        else:
+            obs = self._current_obs
+
+        # Convert to torch tensor and change to (3, H, W) format
+        obs_tensor = torch.from_numpy(obs).float()
+        obs_tensor = obs_tensor.permute(2, 0, 1)  # (H, W, 3) -> (3, H, W)
+
+        return obs_tensor
 
 
 class ChannelFirstWrapper(gym.ObservationWrapper):

@@ -235,41 +235,21 @@ class MiniGridMPCEvaluator(MPCEvaluator):
 
         targets = torch.from_numpy(np.stack(targets)).to(self.device)
 
-        # 初期観測を取得（先にリセットして環境を初期化）
-        observation_history = []
+        # 環境をリセット
         for env in envs:
-            obs, _ = env.reset()
-            observation_history.append(torch.from_numpy(obs).float())
+            env.reset()
 
-        # (bs, H, W, 3) -> (bs, 3, H, W) にチャンネル順序を変更
-        obs_batch = torch.stack(observation_history).to(self.device)
-        obs_batch = obs_batch.permute(0, 3, 1, 2).contiguous()
-        observation_history = [obs_batch]
+        # 目標観測を取得（DiverseMazeと同じアプローチ）
+        targets_t = torch.stack([e.get_target_obs(as_tensor=True) for e in envs]).to(self.device)
 
-        # 目標観測を取得（環境がリセットされた後）
-        # MiniGridでは、目標位置にエージェントを仮想的に配置してレンダリング
-        # DiverseMazeの get_target_obs() と同じアプローチ
-        target_obs_list = []
-        for i, env in enumerate(envs):
-            # 環境のget_target_obs()を使って目標位置での観測を取得
-            target_obs = env.get_target_obs()  # (H, W, 3) uint8
-            target_obs_list.append(torch.from_numpy(target_obs).float())
-
-        target_obs_batch = torch.stack(target_obs_list).to(self.device)  # (bs, H, W, 3)
-
-        # チャンネルを最初の次元に移動 (bs, H, W, 3) -> (bs, 3, H, W)
-        target_obs_batch = target_obs_batch.permute(0, 3, 1, 2).contiguous()
-
-        # 正規化
-        if self.normalizer is not None:
-            target_obs_batch = self.normalizer.normalize_state(target_obs_batch)
-
-        # バックボーンで目標観測をエンコード
-        with torch.no_grad():
-            target_enc = self.model.backbone(target_obs_batch).obs_component.detach()
+        # 目標観測をバックボーンでエンコード
+        targets_t = self.model.backbone(targets_t).obs_component.detach()
 
         # エンコードされた目標表現をプランナーに設定
-        planner.reset_targets(target_enc, repr_input=True)
+        planner.reset_targets(targets_t, repr_input=True)
+
+        # 初期観測を取得（DiverseMazeと同じアプローチ）
+        observation_history = [torch.stack([e.get_obs() for e in envs])]
 
         obs_t = observation_history[0]
         if self.image_based:
@@ -293,22 +273,14 @@ class MiniGridMPCEvaluator(MPCEvaluator):
 
         # MPCループ
         for step in range(self.config.n_steps):
-            # 現在の観測をエンコード
-            if self.normalizer is not None:
-                obs_t_norm = self.normalizer.normalize_state(obs_t)
-            else:
-                obs_t_norm = obs_t
-
-            with torch.no_grad():
-                obs_encoded = self.model.backbone(obs_t_norm).obs_component.detach()
-
             # プランニング
             # plan_sizeは残りステップ数とmax_plan_lengthの小さい方
             plan_size = min(
                 self.config.n_steps - step,
                 self.config.level1.max_plan_length
             )
-            actions, info = planner.plan(obs_encoded, plan_size=plan_size)
+            # プランナーには生の観測を渡す（プランナー内部でエンコードされる）
+            actions, info = planner.plan(obs_t, plan_size=plan_size, repr_input=False)
 
             # 最初のアクションを実行
             action = actions[:, 0]  # (bs, action_dim)
@@ -317,13 +289,11 @@ class MiniGridMPCEvaluator(MPCEvaluator):
             action_indices = torch.argmax(action, dim=-1).cpu().numpy()
 
             # 環境でアクションを実行
-            next_obs_list = []
             rewards = []
             current_locations = []
 
             for i, env in enumerate(envs):
                 obs, reward, done, truncated, info_dict = env.step(int(action_indices[i]))
-                next_obs_list.append(torch.from_numpy(obs).float())
                 rewards.append(reward)
 
                 # 現在位置を取得
@@ -343,10 +313,8 @@ class MiniGridMPCEvaluator(MPCEvaluator):
             if 'loss_history' in info:
                 loss_history.append(info['loss_history'])
 
-            # 次の観測を準備
-            obs_t = torch.stack(next_obs_list).to(self.device)  # (bs, H, W, 3)
-            # チャンネルを最初の次元に移動 (bs, H, W, 3) -> (bs, 3, H, W)
-            obs_t = obs_t.permute(0, 3, 1, 2).contiguous()
+            # 次の観測を取得（DiverseMazeと同じアプローチ）
+            obs_t = torch.stack([e.get_obs() for e in envs])
             if self.image_based:
                 obs_t = torch.cat([obs_t] * self.config.stack_states, dim=1)
             observation_history.append(obs_t)
