@@ -7,13 +7,15 @@
 #   bash pldm_envs/minigrid/data_generation/parallel_generate.sh \
 #       --env_name MiniGrid-Empty-8x8-v0 \
 #       --n_episodes 10000 \
-#       --workers 4 \
+#       --workers 20 \
+#       --jobs 8 \
 #       --output_dir data/minigrid/parallel_test
 #
 # オプション:
 #   --env_name: MiniGrid環境名 (デフォルト: MiniGrid-Empty-8x8-v0)
 #   --n_episodes: 総エピソード数 (デフォルト: 10000)
-#   --workers: ワーカー数 (デフォルト: 4)
+#   --workers: 総分割数 (デフォルト: 4)
+#   --jobs: 同時実行数 (デフォルト: workersと同じ)
 #   --output_dir: 出力ディレクトリ (デフォルト: data/minigrid/parallel)
 #   --max_steps: 最大ステップ数 (オプション)
 #   --resize: リサイズサイズ (オプション、例: 72)
@@ -23,6 +25,7 @@
 ENV_NAME="MiniGrid-Empty-8x8-v0"
 N_EPISODES=10000
 WORKERS=4
+JOBS=""
 OUTPUT_DIR="data/minigrid/parallel"
 MAX_STEPS=""
 RESIZE=""
@@ -41,6 +44,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --workers)
             WORKERS="$2"
+            shift 2
+            ;;
+        --jobs)
+            JOBS="$2"
             shift 2
             ;;
         --output_dir)
@@ -66,6 +73,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# JOBSが指定されていない場合はWORKERSと同じにする
+if [ -z "$JOBS" ]; then
+    JOBS=$WORKERS
+fi
+
 # エピソード数がワーカー数で割り切れるか確認
 if [ $((N_EPISODES % WORKERS)) -ne 0 ]; then
     echo "Error: n_episodes ($N_EPISODES) must be divisible by workers ($WORKERS)"
@@ -77,7 +89,8 @@ echo "Parallel Data Generation"
 echo "========================================"
 echo "Environment: $ENV_NAME"
 echo "Total episodes: $N_EPISODES"
-echo "Workers: $WORKERS"
+echo "Total workers (splits): $WORKERS"
+echo "Concurrent jobs: $JOBS"
 echo "Episodes per worker: $((N_EPISODES / WORKERS))"
 echo "Output directory: $OUTPUT_DIR"
 echo "========================================"
@@ -90,10 +103,31 @@ export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 
 # 各ワーカーをバックグラウンドで起動
 PIDS=()
+RUNNING_PIDS=()
+
 for ((i=0; i<WORKERS; i++)); do
+    # 同時実行数の制御
+    while true; do
+        # 実行中のプロセス数をカウント
+        CURRENT_JOBS=0
+        NEW_RUNNING_PIDS=()
+        for pid in "${RUNNING_PIDS[@]}"; do
+            if kill -0 "$pid" 2>/dev/null; then
+                CURRENT_JOBS=$((CURRENT_JOBS + 1))
+                NEW_RUNNING_PIDS+=("$pid")
+            fi
+        done
+        RUNNING_PIDS=("${NEW_RUNNING_PIDS[@]}")
+
+        if [ "$CURRENT_JOBS" -lt "$JOBS" ]; then
+            break
+        fi
+        sleep 1
+    done
+
     OUTPUT_FILE="$OUTPUT_DIR/worker_$i.npz"
 
-    echo "Starting worker $i -> $OUTPUT_FILE"
+    echo "Starting worker $i -> $OUTPUT_FILE (Running: $((CURRENT_JOBS + 1))/$JOBS)"
 
     python pldm_envs/minigrid/data_generation/generate_data.py \
         --env_name "$ENV_NAME" \
@@ -105,13 +139,14 @@ for ((i=0; i<WORKERS; i++)); do
         $RESIZE \
         $PAD_LENGTH \
         > "$OUTPUT_DIR/worker_$i.log" 2>&1 &
-
-    PIDS+=($!)
+    
+    PID=$!
+    PIDS+=($PID)
+    RUNNING_PIDS+=($PID)
 done
 
 echo ""
 echo "All workers started. Waiting for completion..."
-echo "PIDs: ${PIDS[@]}"
 echo ""
 echo "Monitor progress with:"
 echo "  tail -f $OUTPUT_DIR/worker_*.log"
@@ -121,10 +156,11 @@ echo ""
 FAILED=0
 for i in "${!PIDS[@]}"; do
     PID=${PIDS[$i]}
-    echo "Waiting for worker $i (PID: $PID)..."
+    # echo "Waiting for worker $i (PID: $PID)..."
 
     if wait $PID; then
-        echo "  Worker $i completed successfully"
+        # echo "  Worker $i completed successfully"
+        :
     else
         echo "  Worker $i failed!"
         FAILED=1
