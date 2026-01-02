@@ -17,7 +17,7 @@ echo ""
 
 # Step 1: プロプリオセプティブデータ（位置、アクションなど）を生成
 echo "Step 1/3: Generating proprioceptive data..."
-python pldm_envs/diverse_maze/data_generation/generate_data.py \
+PYTHONPATH=$PWD:$PYTHONPATH python pldm_envs/diverse_maze/data_generation/generate_data.py \
     --output_path "$OUTPUT_PATH" \
     --config pldm_envs/diverse_maze/configs/sample_10episodes.yaml
 
@@ -36,7 +36,7 @@ echo ""
 
 # Step 2: PNG画像をレンダリング
 echo "Step 2/3: Rendering images..."
-python pldm_envs/diverse_maze/data_generation/render_data.py \
+PYTHONPATH=$PWD:$PYTHONPATH python pldm_envs/diverse_maze/data_generation/render_data.py \
     --data_path "$OUTPUT_PATH"
 
 if [ $? -ne 0 ]; then
@@ -51,7 +51,7 @@ echo ""
 
 # Step 3: 画像をnumpy配列に変換
 echo "Step 3/3: Converting images to numpy array..."
-python pldm_envs/diverse_maze/data_generation/postprocess_images.py \
+PYTHONPATH=$PWD:$PYTHONPATH python pldm_envs/diverse_maze/data_generation/postprocess_images.py \
     --data_path "$OUTPUT_PATH"
 
 if [ $? -ne 0 ]; then
@@ -73,6 +73,6 @@ echo "  - $OUTPUT_PATH/images.zarr (zarr array)"
 echo "  - $OUTPUT_PATH/images.npy (numpy array) ← USE THIS"
 echo ""
 echo "Data shape info:"
-python -c "import numpy as np; arr=np.load('$OUTPUT_PATH/images.npy'); print(f'  Images shape: {arr.shape}'); print(f'  File size: {arr.nbytes / (1024*1024):.2f} MB')" 2>/dev/null || echo "  (Run after completion)"
+PYTHONPATH=$PWD:$PYTHONPATH python -c "import numpy as np; arr=np.load('$OUTPUT_PATH/images.npy'); print(f'  Images shape: {arr.shape}'); print(f'  File size: {arr.nbytes / (1024*1024):.2f} MB')" 2>/dev/null || echo "  (Run after completion)"
 echo ""
 echo "You can now use this data for training!"
