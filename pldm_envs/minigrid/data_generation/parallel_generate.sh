@@ -195,15 +195,15 @@ if [ $? -eq 0 ]; then
     echo "========================================"
     echo "Output file: $OUTPUT_DIR/train.npz"
     echo ""
-    echo "Cleanup temporary worker files? (y/n)"
-    read -r CLEANUP
+    # echo "Cleanup temporary worker files? (y/n)"
+    # read -r CLEANUP
 
-    if [ "$CLEANUP" = "y" ] || [ "$CLEANUP" = "Y" ]; then
-        echo "Removing worker files..."
-        rm "$OUTPUT_DIR"/worker_*.npz
-        rm "$OUTPUT_DIR"/worker_*.log
-        echo "Cleanup completed"
-    fi
+    # if [ "$CLEANUP" = "y" ] || [ "$CLEANUP" = "Y" ]; then
+    #     echo "Removing worker files..."
+    #     rm "$OUTPUT_DIR"/worker_*.npz
+    #     rm "$OUTPUT_DIR"/worker_*.log
+    #     echo "Cleanup completed"
+    # fi
 else
     echo ""
     echo "========================================"
