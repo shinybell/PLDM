@@ -182,6 +182,7 @@ def pad_episode(episode, target_length):
             "actions": episode["actions"][: target_length - 1],
             "rewards": episode["rewards"][: target_length - 1],
             "dones": episode["dones"][: target_length - 1],
+            "positions": episode["positions"][:target_length],
         }
     else:
         # パディング
