@@ -1,0 +1,20 @@
+# MiniGrid サンプルデータ生成用設定（10エピソード）
+# テスト・デバッグ用の小規模データセット
+
+env_name: MiniGrid-Empty-8x8-v0
+n_episodes: 10
+episode_length: 100  # 最大ステップ数
+img_size: [64, 64, 3]  # リサイズ後の画像サイズ
+
+# ポリシー設定
+policy_type: random  # ランダムポリシー
+
+# 画像設定
+tile_size: 8  # MiniGridのタイルサイズ
+agent_view_size: null  # null=全体観測
+
+# シード
+seed: 42
+
+# その他
+render: false  # レンダリング無効（高速化）

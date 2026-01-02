@@ -285,6 +285,18 @@ def main():
         default=None,
         help="エージェントの視界サイズ（指定しない場合は全体観測）",
     )
+    parser.add_argument(
+        "--workers_num",
+        type=int,
+        default=None,
+        help="並列ワーカー数（指定した場合はワーカー分割モード）",
+    )
+    parser.add_argument(
+        "--worker_id",
+        type=int,
+        default=0,
+        help="ワーカーID（0から始まる、workers_numと併用）",
+    )
 
     args = parser.parse_args()
 
@@ -292,11 +304,28 @@ def main():
     output_path = Path(args.output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # ワーカー分割の計算
+    if args.workers_num is not None:
+        per_worker = args.n_episodes // args.workers_num
+        assert (
+            per_worker * args.workers_num == args.n_episodes
+        ), f"n_episodes ({args.n_episodes}) must be divisible by workers_num ({args.workers_num})"
+        start_episode = per_worker * args.worker_id
+        end_episode = start_episode + per_worker
+        episode_indices = range(start_episode, end_episode)
+        print(f"Worker mode: {args.worker_id}/{args.workers_num}")
+        print(f"Generating episodes {start_episode} to {end_episode - 1}")
+    else:
+        episode_indices = range(args.n_episodes)
+
     print("=" * 60)
     print("MiniGrid Data Generation")
     print("=" * 60)
     print(f"Environment: {args.env_name}")
     print(f"Episodes: {args.n_episodes}")
+    if args.workers_num is not None:
+        print(f"Worker: {args.worker_id + 1}/{args.workers_num}")
+        print(f"Episode range: {start_episode}-{end_episode - 1} ({len(episode_indices)} episodes)")
     print(f"Output: {args.output_path}")
     print(f"Policy: {args.policy_type}")
     print(f"Max steps: {args.max_steps if args.max_steps else 'Default'}")
@@ -345,9 +374,9 @@ def main():
     all_episodes = []
     episode_lengths = []
 
-    print(f"\nGenerating {args.n_episodes} episodes...")
+    print(f"\nGenerating {len(episode_indices)} episodes...")
 
-    for ep_idx in tqdm(range(args.n_episodes), desc="Episodes"):
+    for ep_idx in tqdm(episode_indices, desc="Episodes"):
         episode = generate_episode(
             env, policy, max_steps=args.max_steps or 1000, seed=args.seed + ep_idx
         )
