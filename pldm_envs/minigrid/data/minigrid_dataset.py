@@ -111,54 +111,90 @@ class MiniGridDataset(torch.utils.data.Dataset):
         print(f"  Total samples: {len(self)}")
 
     def _load_data(self):
-        """NPZファイルからデータをロード"""
+        """NPZファイルまたはディレクトリからデータをロード"""
         data_path = Path(self.config.data_path)
 
         if not data_path.exists():
-            raise FileNotFoundError(f"Data file not found: {data_path}")
+            raise FileNotFoundError(f"Data path not found: {data_path}")
 
-        if data_path.suffix != '.npz':
-            raise ValueError(
+        print(f"Loading data from {data_path}")
+
+        if data_path.is_dir():
+            # ディレクトリからロード (.npy files)
+            print("Loading from directory (mmap_mode='r')")
+            
+            def load_npy(filename):
+                return np.load(data_path / filename, mmap_mode='r')
+
+            self.observations = load_npy('observations.npy')
+            self.actions = load_npy('actions.npy')
+            
+            if (data_path / 'positions.npy').exists():
+                self.locations = load_npy('positions.npy')
+            elif (data_path / 'locations.npy').exists():
+                self.locations = load_npy('locations.npy')
+            else:
+                 raise ValueError(
+                    "Dataset must contain 'positions.npy' or 'locations.npy'. "
+                    "Please regenerate the dataset with position information."
+                )
+
+            # 報酬（オプション）
+            if (data_path / 'rewards.npy').exists() and self.config.include_rewards:
+                self.rewards = load_npy('rewards.npy')
+            else:
+                self.rewards = None
+
+            # 終端フラグ（オプション）
+            if (data_path / 'dones.npy').exists() and self.config.include_dones:
+                self.dones = load_npy('dones.npy')
+            else:
+                self.dones = None
+
+        elif data_path.suffix == '.npz':
+            # NPZファイルからロード
+            print("Loading from .npz file")
+
+            # メモリマップモードで読み込み（大量データでもメモリ節約）
+            if self.config.quick_debug:
+                data = np.load(data_path, allow_pickle=True)
+            else:
+                data = np.load(data_path, allow_pickle=True, mmap_mode='r')
+
+            # observations: [N_episodes, T, H, W, C] uint8
+            self.observations = data['observations']
+
+            # actions: [N_episodes, T-1] int
+            self.actions = data['actions']
+
+            # locations: [N_episodes, T, 2] float32 - エージェント位置 (x, y)
+            if 'positions' in data:
+                self.locations = data['positions']
+            elif 'locations' in data:
+                self.locations = data['locations']
+            else:
+                raise ValueError(
+                    "Dataset must contain 'positions' or 'locations' field. "
+                    "Please regenerate the dataset with position information."
+                )
+
+            # 報酬（オプション）
+            if 'rewards' in data and self.config.include_rewards:
+                self.rewards = data['rewards']
+            else:
+                self.rewards = None
+
+            # 終端フラグ（オプション）
+            if 'dones' in data and self.config.include_dones:
+                self.dones = data['dones']
+            else:
+                self.dones = None
+        
+        else:
+             raise ValueError(
                 f"Unsupported file format: {data_path.suffix}. "
-                "Only .npz format is supported."
+                "Only .npz format or directory of .npy files is supported."
             )
-
-        print(f"Loading NPZ file from {data_path}")
-
-        # メモリマップモードで読み込み（大量データでもメモリ節約）
-        if self.config.quick_debug:
-            data = np.load(data_path, allow_pickle=True)
-        else:
-            data = np.load(data_path, allow_pickle=True, mmap_mode='r')
-
-        # observations: [N_episodes, T, H, W, C] uint8
-        self.observations = data['observations']
-
-        # actions: [N_episodes, T-1] int
-        self.actions = data['actions']
-
-        # locations: [N_episodes, T, 2] float32 - エージェント位置 (x, y)
-        if 'positions' in data:
-            self.locations = data['positions']
-        elif 'locations' in data:
-            self.locations = data['locations']
-        else:
-            raise ValueError(
-                "Dataset must contain 'positions' or 'locations' field. "
-                "Please regenerate the dataset with position information."
-            )
-
-        # 報酬（オプション）
-        if 'rewards' in data and self.config.include_rewards:
-            self.rewards = data['rewards']
-        else:
-            self.rewards = None
-
-        # 終端フラグ（オプション）
-        if 'dones' in data and self.config.include_dones:
-            self.dones = data['dones']
-        else:
-            self.dones = None
 
         print(f"  Observations: {self.observations.shape} {self.observations.dtype}")
         print(f"  Actions: {self.actions.shape} {self.actions.dtype}")
