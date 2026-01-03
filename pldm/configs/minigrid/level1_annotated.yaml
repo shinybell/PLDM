@@ -1,0 +1,823 @@
+# ==============================================================================
+# MiniGrid Level1 PLDM学習設定ファイル（全設定項目に詳細コメント付き）
+# ==============================================================================
+#
+# このファイルは、MiniGrid環境でPLDM（Predictive Latent Dynamics Models）を
+# 学習するための設定ファイルです。全ての設定項目に詳細な説明を記載しています。
+#
+# 使用方法:
+#   python pldm/train.py --configs pldm/configs/minigrid/level1_annotated.yaml
+#
+# コマンドラインで設定を上書き:
+#   python pldm/train.py --configs pldm/configs/minigrid/level1_annotated.yaml \
+#     --values wandb=True epochs=100 base_lr=0.001
+#
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 基本設定
+# ------------------------------------------------------------------------------
+
+# n_steps: モデルが予測するタイムステップ数（コンテキスト長）
+# - モデルは n_steps 個の観測を入力として受け取り、将来の状態を予測します
+# - 長いほどより長期的な依存関係を学習できますが、メモリ消費が増加します
+# - 推奨値: 16（MiniGridの場合）
+n_steps: &n_steps 16
+
+# val_n_steps: 検証時のタイムステップ数
+# - 通常は訓練時と同じ値を使用します
+val_n_steps: *n_steps
+
+# env_name: 環境名（評価時に使用）
+# - MiniGrid環境を識別するための名前
+# - eval_cfg.env_name で参照されます
+env_name: &env_name minigrid_level1
+
+# ==============================================================================
+# データ設定
+# ==============================================================================
+
+data:
+  # --------------------------------------------------------------------------
+  # データ正規化設定
+  # --------------------------------------------------------------------------
+
+  # normalize: データローダーレベルでの正規化を行うか
+  # - MiniGridの場合は false（データセット側で正規化するため）
+  # - true の場合、データローダーが自動的に正規化を適用
+  normalize: false
+
+  # min_max_normalize_state: 状態を[0, 1]にMin-Max正規化するか
+  # - 画像データの場合は通常 false
+  # - 連続状態空間（位置、速度など）の場合に true を検討
+  min_max_normalize_state: false
+
+  # --------------------------------------------------------------------------
+  # データセット設定
+  # --------------------------------------------------------------------------
+
+  # dataset_type: 使用するデータセットのタイプ
+  # - DatasetType.MiniGrid: MiniGrid環境用のデータセット
+  # - その他: DatasetType.Wall, DatasetType.D4RL など
+  dataset_type: DatasetType.MiniGrid
+
+  # num_workers: データローディング用のワーカープロセス数
+  # - 0: メインプロセスでロード（デバッグ時推奨）
+  # - >0: マルチプロセスでロード（高速化）
+  # - 推奨値: CPUコア数 - 2（例: 4-8）
+  num_workers: 0
+
+  # quick_debug: デバッグモード
+  # - true の場合、データセットサイズを縮小して高速にテスト
+  # - 本番学習時は false に設定
+  quick_debug: false
+
+  # --------------------------------------------------------------------------
+  # MiniGrid固有の設定
+  # --------------------------------------------------------------------------
+
+  minigrid_config:
+    # ------------------------------------------------------------------------
+    # データパス設定
+    # ------------------------------------------------------------------------
+
+    # data_path: 訓練データのパス
+    # - .npz ファイル（シングルプロセス生成）
+    # - ディレクトリ（並列生成、メモリマップ対応）
+    # 例: "data/minigrid/level1_train.npz"
+    #     "data/minigrid/level1_10k/train"（ディレクトリ形式）
+    data_path: "data/minigrid/level1_train.npz"
+
+    # val_path: 検証データのパス（オプション）
+    # - null の場合、訓練データから自動分割
+    # - 明示的に指定することを推奨
+    val_path: "data/minigrid/level1_val.npz"
+
+    # ------------------------------------------------------------------------
+    # データセットパラメータ
+    # ------------------------------------------------------------------------
+
+    # sample_length: サンプルのシーケンス長
+    # - n_steps と同じ値を使用（YAMLアンカーで参照）
+    # - モデルが一度に処理する観測数
+    sample_length: *n_steps
+
+    # img_size: 画像のサイズ（ピクセル）
+    # - 生成データの観測サイズと一致させる必要があります
+    # - 推奨値: 72（MiniGrid標準サイズ）
+    # - サイズが大きいほど計算コストが増加
+    img_size: 72
+
+    # normalize_images: 画像を[0, 1]に正規化するか
+    # - true: uint8 [0, 255] → float32 [0, 1]
+    # - データがすでに正規化されている場合は false
+    normalize_images: true
+
+    # ------------------------------------------------------------------------
+    # データ拡張・フィルタリング
+    # ------------------------------------------------------------------------
+
+    # include_rewards: 報酬情報をモデルに渡すか
+    # - false: 報酬を使わない（教師なし学習）
+    # - true: 報酬も入力として使用（強化学習タスク向け）
+    include_rewards: false
+
+    # include_dones: エピソード終了フラグを使用するか
+    # - false: 終了情報を使わない
+    # - true: エピソード境界を明示的に扱う
+    include_dones: false
+
+    # ------------------------------------------------------------------------
+    # 訓練パラメータ
+    # ------------------------------------------------------------------------
+
+    # batch_size: バッチサイズ
+    # - 推奨値: 16（テスト）、32-64（標準）、128-256（大規模学習）
+    # - メモリ使用量と学習の安定性に影響
+    # - GPU メモリに応じて調整
+    batch_size: 16
+
+    # crop_length: エピソードを切り詰める長さ（オプション）
+    # - null: 全データを使用
+    # - 整数: 指定長に統一（長いエピソードは切り詰め）
+    crop_length: null
+
+    # train: 訓練モードかどうか
+    # - true: データ拡張やシャッフルを有効化
+    # - false: 評価モード（シャッフルなし）
+    train: true
+
+    # quick_debug: データセット個別のデバッグモード
+    # - 親の quick_debug と同じ動作
+    quick_debug: false
+
+# ==============================================================================
+# 訓練設定
+# ==============================================================================
+
+# epochs: 訓練エポック数
+# - 1エポック = データセット全体を1回処理
+# - 推奨値: 3（テスト）、50-100（標準）、200-300（長期学習）
+# - 早期終了を使う場合は大きめに設定
+epochs: 3
+
+# base_lr: 基本学習率
+# - オプティマイザの初期学習率
+# - Adam: 0.0001-0.001（推奨: 0.001）
+# - LARS: 0.1-0.5（大規模バッチ向け）
+# - 学習が不安定な場合は小さくする
+base_lr: 0.001
+
+# optimizer_type: オプティマイザの種類
+# - Adam: 標準的な最適化アルゴリズム（推奨）
+# - LARS: 大規模バッチ学習向け
+# - SGD: シンプルだが学習が遅い
+optimizer_type: Adam
+
+# optimizer_schedule: 学習率スケジューラ
+# - Cosine: コサインアニーリング（推奨）
+# - Constant: 学習率固定
+# - Linear: 線形減衰
+# - StepLR: ステップごとに減衰
+optimizer_schedule: Cosine
+
+# ==============================================================================
+# モデル設定（HJEPA: Hierarchical Joint Embedding Predictive Architecture）
+# ==============================================================================
+
+hjepa:
+  # --------------------------------------------------------------------------
+  # レベル設定（階層的アーキテクチャ）
+  # --------------------------------------------------------------------------
+
+  # train_l1: Level 1（低レベル表現）を訓練するか
+  # - true: 画像エンコーダと予測器を訓練
+  # - false: Level 1 を固定（事前学習済みモデルを使う場合）
+  train_l1: true
+
+  # freeze_l1: Level 1 の重みを固定するか
+  # - false: 訓練時に更新
+  # - true: 重みを固定（Level 2 のみ訓練する場合）
+  freeze_l1: false
+
+  # disable_l2: Level 2（高レベル表現）を無効化するか
+  # - true: Level 1 のみ使用（MiniGridの場合推奨）
+  # - false: 階層的な2レベルモデルを使用
+  disable_l2: true
+
+  # l1_n_steps: Level 1 のタイムステップ数
+  # - 通常は n_steps と同じ
+  l1_n_steps: *n_steps
+
+  # --------------------------------------------------------------------------
+  # Level 1 アーキテクチャ
+  # --------------------------------------------------------------------------
+
+  level1:
+    # ------------------------------------------------------------------------
+    # バックボーン（画像エンコーダ）設定
+    # ------------------------------------------------------------------------
+
+    backbone:
+      # arch: バックボーンアーキテクチャ
+      # - impala: IMPALA CNN（強化学習で実績のある畳み込みネットワーク）
+      # - resnet18: ResNet-18（画像認識で標準的）
+      # - menet5: 軽量なカスタムネットワーク
+      # 推奨: impala（MiniGridに適している）
+      arch: impala
+
+      # backbone_subclass: アーキテクチャのサブクラス
+      # - impala の場合: "i"（標準）
+      # - 他のアーキテクチャでは異なる値
+      backbone_subclass: i
+
+      # backbone_mlp: バックボーン後に追加するMLPの設定
+      # - null: MLPなし
+      # - "512-256": 2層MLP（512→256次元）
+      backbone_mlp: null
+
+      # backbone_norm: 正規化層の種類
+      # - group_norm: Group Normalization（推奨）
+      # - batch_norm: Batch Normalization
+      # - layer_norm: Layer Normalization
+      # - null: 正規化なし
+      backbone_norm: group_norm
+
+      # backbone_pool: プーリング方法
+      # - dim_reduce: 次元削減（推奨）
+      # - avg_pool: 平均プーリング
+      # - max_pool: 最大プーリング
+      backbone_pool: dim_reduce
+
+      # backbone_final_fc: 最終層に全結合層を追加するか
+      # - false: 畳み込み層の出力をそのまま使用（推奨）
+      # - true: 全結合層を追加
+      backbone_final_fc: false
+
+      # backbone_width_factor: ネットワークの幅を調整する係数
+      # - 1: 標準的な幅
+      # - >1: より広いネットワーク（表現力向上、計算コスト増）
+      # - <1: より狭いネットワーク（計算コスト削減）
+      # IMPALA の場合は 1 推奨
+      backbone_width_factor: 1
+
+      # channels: 入力画像のチャンネル数
+      # - 3: RGB画像
+      # - 1: グレースケール
+      # - 4: RGBA（アルファチャンネル付き）
+      channels: 3
+
+      # input_dim: 入力の次元（状態ベース環境の場合）
+      # - null: 画像入力（自動推論）
+      # - 整数: 状態ベクトルの次元
+      input_dim: null
+
+      # final_ln: 最終層にLayer Normalizationを適用するか
+      # - true: 表現の安定化（推奨）
+      # - false: 正規化なし
+      final_ln: true
+
+    # ------------------------------------------------------------------------
+    # 予測器（動力学モデル）設定
+    # ------------------------------------------------------------------------
+
+    predictor:
+      # predictor_arch: 予測器のアーキテクチャ
+      # - rnnV2: RNN（Recurrent Neural Network）V2（推奨）
+      # - transformer: Transformer ベース
+      # - mlp: 単純な MLP（時系列依存なし）
+      predictor_arch: rnnV2
+
+      # predictor_subclass: 予測器の隠れ層サイズ
+      # - "512-512": 2層、各512次元
+      # - "1024-1024": より大きなモデル
+      # - "256-256": より小さなモデル
+      predictor_subclass: "512-512"
+
+      # rnn_layers: RNN の層数
+      # - 1: 単層 RNN（推奨）
+      # - 2-3: より深い RNN（長期依存性が重要な場合）
+      rnn_layers: 1
+
+      # z_dim: 確率的潜在変数の次元
+      # - 0: 決定的モデル（推奨、MiniGrid の場合）
+      # - >0: 確率的モデル（不確実性を明示的にモデル化）
+      z_dim: 0
+
+      # z_min_std: 潜在変数の最小標準偏差
+      # - 確率的モデル（z_dim > 0）の場合に使用
+      # - モードコラプスを防ぐための下限値
+      z_min_std: 0.1
+
+      # residual: 残差接続を使用するか
+      # - true: 勾配の流れを改善（推奨）
+      # - false: 残差接続なし
+      residual: true
+
+      # predictor_ln: 予測器に Layer Normalization を適用するか
+      # - true: 学習の安定化（推奨）
+      # - false: 正規化なし
+      predictor_ln: true
+
+      # tie_backbone_ln: バックボーンと予測器の LayerNorm を共有するか
+      # - true: パラメータ削減、整合性向上（推奨）
+      # - false: 独立した正規化層
+      tie_backbone_ln: true
+
+    # ------------------------------------------------------------------------
+    # アクション設定
+    # ------------------------------------------------------------------------
+
+    # action_dim: アクション空間の次元
+    # - MiniGrid: 7（左回転、右回転、前進、拾う、落とす、トグル、完了）
+    # - 連続制御環境: アクションベクトルの次元
+    action_dim: 7
+
+    # momentum: Exponential Moving Average (EMA) のモメンタム
+    # - 0: EMA なし（推奨）
+    # - 0.99-0.999: ターゲットネットワークの更新に使用
+    momentum: 0
+
+  # --------------------------------------------------------------------------
+  # その他のモデル設定
+  # --------------------------------------------------------------------------
+
+  # step_skip: 予測時にスキップするステップ数
+  # - 1: 全ステップを予測
+  # - 4: 4ステップごとに予測（計算コスト削減）
+  # - 長期予測が重要な場合は小さく設定
+  step_skip: 4
+
+# ==============================================================================
+# 学習目的関数（Loss Functions）
+# ==============================================================================
+
+objectives_l1:
+  # --------------------------------------------------------------------------
+  # 使用する損失関数のリスト
+  # --------------------------------------------------------------------------
+
+  # objectives: 組み合わせる損失関数
+  # - VICReg: Variance-Invariance-Covariance Regularization（表現学習）
+  # - IDM: Inverse Dynamics Model（逆動力学モデル、アクション予測）
+  # - その他: FDM（Forward Dynamics Model）、Reconstruction など
+  objectives:
+    - VICReg
+    - IDM
+
+  # --------------------------------------------------------------------------
+  # VICReg 損失の設定
+  # --------------------------------------------------------------------------
+
+  vicreg:
+    # projector: プロジェクションヘッドの種類
+    # - id: 恒等写像（そのまま使用）
+    # - mlp: MLP プロジェクター（対照学習で使用）
+    projector: id
+
+    # random_projector: ランダムプロジェクションを使用するか
+    # - false: 学習可能なプロジェクター
+    # - true: ランダム固定プロジェクター
+    random_projector: false
+
+    # sim_coeff: 類似性損失の係数（空間次元）
+    # - 異なる位置の特徴が類似しないようにする
+    # - 大きいほど多様性を強く促進
+    sim_coeff: 1.0
+
+    # std_coeff: 標準偏差損失の係数（空間次元）
+    # - 特徴の分散が小さくなりすぎないようにする
+    # - モードコラプスを防ぐ
+    std_coeff: 3.0
+
+    # cov_coeff: 共分散損失の係数（空間次元）
+    # - 異なる次元の特徴が独立するようにする
+    # - 冗長性を減らす
+    cov_coeff: 6.9238
+
+    # std_coeff_t: 標準偏差損失の係数（時間次元）
+    # - 時間方向の特徴の分散を制御
+    std_coeff_t: 0.24535
+
+    # cov_coeff_t: 共分散損失の係数（時間次元）
+    # - 時間方向の特徴の独立性を制御
+    # - 0: 時間方向の共分散損失を使わない
+    cov_coeff_t: 0.0
+
+    # sim_coeff_t: 類似性損失の係数（時間次元）
+    # - 時間方向の特徴の類似性を制御
+    sim_coeff_t: 0.74242
+
+    # cov_per_feature: 特徴ごとに共分散を計算するか
+    # - false: 全特徴の共分散を一括計算（推奨）
+    # - true: 特徴ごとに個別計算
+    cov_per_feature: false
+
+    # adjust_cov: 共分散を調整するか
+    # - true: 正則化項を追加（推奨）
+    # - false: 調整なし
+    adjust_cov: true
+
+    # cov_chunk_size: 共分散計算のチャンクサイズ
+    # - null: 全データを一度に計算
+    # - 整数: メモリ節約のためにチャンクごとに計算
+    cov_chunk_size: null
+
+    # std_margin: 標準偏差の下限値（空間次元）
+    # - 特徴の分散がこの値以下にならないようにする
+    std_margin: 1.0
+
+    # std_margin_t: 標準偏差の下限値（時間次元）
+    std_margin_t: 1.0
+
+  # --------------------------------------------------------------------------
+  # IDM（逆動力学モデル）損失の設定
+  # --------------------------------------------------------------------------
+
+  idm:
+    # coeff: IDM 損失の重み係数
+    # - 大きいほどアクション予測を重視
+    # - VICReg との バランスを調整
+    coeff: 1.072
+
+    # action_dim: アクション空間の次元
+    # - level1.action_dim と同じ値
+    action_dim: 7
+
+    # arch: IDM ネットワークのアーキテクチャ
+    # - "512": 1層、512次元
+    # - "512-256": 2層、512→256次元
+    arch: "512"
+
+    # arch_subclass: アーキテクチャのサブクラス
+    # - "a": 標準的な構成
+    arch_subclass: a
+
+    # use_pred: 予測された表現を使うか
+    # - false: エンコーダの表現を直接使用（推奨）
+    # - true: 予測器の出力を使用
+    use_pred: false
+
+# ==============================================================================
+# チェックポイント設定
+# ==============================================================================
+
+# load_checkpoint_path: 読み込むチェックポイントのパス
+# - null: ランダム初期化から訓練開始
+# - "path/to/checkpoint.ckpt": 事前学習済みモデルから開始
+load_checkpoint_path: null
+
+# load_l1_only: Level 1 のみをロードするか
+# - false: 全レベルをロード
+# - true: Level 1 のみをロード（Level 2 を新規訓練する場合）
+load_l1_only: false
+
+# ==============================================================================
+# 評価設定
+# ==============================================================================
+
+# eval_at_beginning: 訓練開始前に評価するか
+# - false: すぐに訓練開始（推奨）
+# - true: 初期状態を評価（ランダムモデルの性能確認）
+eval_at_beginning: false
+
+# eval_during_training: 訓練中に定期的に評価するか
+# - false: 訓練終了後のみ評価（高速）
+# - true: 定期的に評価（進捗モニタリング）
+# eval_every_n_epochs と組み合わせて使用
+eval_during_training: false
+
+# eval_only: 評価のみを実行するか
+# - false: 訓練を実行
+# - true: 訓練せず評価のみ（学習済みモデルの評価）
+eval_only: false
+
+# save_every_n_epochs: チェックポイント保存の頻度
+# - 5: 5エポックごとに保存
+# - 推奨値: 5-20（ディスク容量と保存頻度のバランス）
+save_every_n_epochs: 5
+
+# eval_every_n_epochs: 評価実行の頻度
+# - 20: 20エポックごとに評価
+# - eval_during_training=true の場合に有効
+# - 推奨値: 10-20
+eval_every_n_epochs: 20
+
+# train_only: 訓練のみを実行するか（評価をスキップ）
+# - false: 訓練後に評価も実行（推奨）
+# - true: 評価を完全にスキップ（高速訓練）
+train_only: false
+
+# resume_if_possible: 既存のチェックポイントから再開するか
+# - true: output_path に チェックポイントがあれば自動再開
+# - false: 常に最初から訓練
+resume_if_possible: true
+
+# compile_model: PyTorch 2.0 のモデルコンパイル機能を使うか
+# - true: torch.compile() で高速化（推奨、PyTorch 2.0+）
+# - false: コンパイルなし（古い PyTorch バージョン）
+compile_model: true
+
+# --------------------------------------------------------------------------
+# 評価詳細設定
+# --------------------------------------------------------------------------
+
+eval_cfg:
+  # env_name: 評価に使用する環境名
+  # - 基本設定の env_name を参照
+  env_name: *env_name
+
+  # eval_l1: Level 1 を評価するか
+  # - true: Probing、Planning などを実行
+  # - false: Level 1 の評価をスキップ
+  eval_l1: true
+
+  # eval_l2: Level 2 を評価するか
+  # - disable_l2=true の場合は false に設定
+  eval_l2: false
+
+  # disable_planning: プランニング評価を無効化するか
+  # - false: MPC (Model Predictive Control) を実行
+  # - true: プランニングをスキップ（Probing のみ）
+  disable_planning: false
+
+  # probe_preds: 予測器の出力を Probing するか
+  # - false: エンコーダのみ評価
+  # - true: 予測器も評価
+  probe_preds: false
+
+  # probe_encoder: エンコーダを Probing するか
+  # - false: Probing なし
+  # - true: 線形 Probe で表現を評価
+  probe_encoder: false
+
+  # ------------------------------------------------------------------------
+  # Probing 設定
+  # ------------------------------------------------------------------------
+
+  probing:
+    # l1_depth: Probing に使用するシーケンス長
+    # - 8: 8ステップの履歴を使用
+    # - 長いほど長期的な依存性を評価
+    l1_depth: 8
+
+    # train_path: Probing 訓練データのパス（オプション）
+    # - null: メインの訓練データを使用
+    # - パス指定: 別のデータセットを使用
+    train_path: null
+
+    # val_path: Probing 検証データのパス（オプション）
+    val_path: null
+
+    # train_images_path: Probing 用の画像データパス（オプション）
+    train_images_path: null
+
+    # val_images_path: Probing 用の検証画像データパス（オプション）
+    val_images_path: null
+
+    # probe_wall: Wall 環境用の Probing を実行するか
+    # - MiniGrid の場合は false
+    probe_wall: false
+
+    # probe_border: Border 情報を Probing するか
+    probe_border: false
+
+    # probe_encoder: エンコーダを Probing するか
+    # - false: スキップ
+    # - true: 線形 Probe で評価
+    probe_encoder: false
+
+    # visualize_probing: Probing 結果を可視化するか
+    # - true: 予測位置などをプロット（推奨）
+    # - false: 可視化なし
+    visualize_probing: true
+
+    # probe_mpc: MPC の表現を Probing するか
+    probe_mpc: false
+
+    # epochs: Probing の訓練エポック数
+    # - 20: 線形 Probe の訓練エポック数
+    # - 推奨値: 10-50
+    epochs: 20
+
+    # epochs_enc: エンコーダ Probing の訓練エポック数
+    epochs_enc: 30
+
+    # full_finetune: Probing 時に全パラメータを Fine-tuning するか
+    # - false: 線形 Probe のみ訓練（推奨）
+    # - true: エンコーダも含めて訓練
+    full_finetune: false
+
+    # lr: Probing の学習率
+    # - 0.0002: 線形 Probe の学習率
+    # - 推奨値: 0.0001-0.001
+    lr: 0.0002
+
+    # probe_targets: Probing のターゲット
+    # - "locations": 位置情報を予測（MiniGrid）
+    # - "wall": 壁情報を予測（Wall 環境）
+    probe_targets: "locations"
+
+    # locations: 位置予測用の Probe ネットワーク設定
+    locations:
+      # arch: Probe ネットワークのアーキテクチャ
+      # - "512": 1層、512次元の全結合層
+      arch: "512"
+
+      # subclass: アーキテクチャのサブクラス
+      # - "a": 標準的な構成
+      subclass: a
+
+    # schedule: Probing の学習率スケジューラ
+    # - Constant: 学習率固定（推奨）
+    # - Cosine: コサインアニーリング
+    schedule: Constant
+
+    # sample_timesteps: Probing 時にサンプルするタイムステップ数
+    # - 30: 各エピソードから30ステップをサンプル
+    sample_timesteps: 30
+
+  # ------------------------------------------------------------------------
+  # MiniGrid Planning (MPC) 設定
+  # ------------------------------------------------------------------------
+
+  minigrid_planning:
+    # n_envs: 並列実行する環境数
+    # - 4: 4つの環境を並列で評価
+    # - 多いほど高速だが、メモリ消費が増加
+    n_envs: 4
+
+    # n_steps: 各環境の最大ステップ数
+    # - 200: 1エピソードあたり最大200ステップ
+    # - MiniGrid の複雑さに応じて調整
+    n_steps: 200
+
+    # visualize_planning: プランニング結果を可視化するか
+    # - true: 軌跡や予測をプロット（推奨）
+    # - false: 可視化なし
+    visualize_planning: true
+
+    # level: 評価するレベル
+    # - level1: Level 1 の環境を使用
+    level: level1
+
+    # seed: 環境のランダムシード
+    # - 42: 再現性のための固定シード
+    # - 異なる値で複数回実行して平均を取ることを推奨
+    seed: 42
+
+    # error_threshold: 許容誤差の閾値
+    # - 1.0: 目標位置からの距離がこの値以下なら成功
+    # - MiniGrid はグリッドベースなので、通常は小さな値（0.5-1.0）
+    error_threshold: 1.0
+
+    # max_episode_steps: エピソードの最大ステップ数
+    # - 1000: タイムアウトまでのステップ数
+    # - n_steps より大きく設定
+    max_episode_steps: 1000
+
+    # levels: 評価するレベルのリスト
+    # - "level1": Level 1 のみ評価
+    # - "level1,level2,level3": 複数レベル評価
+    levels: "level1"
+
+    # ------------------------------------------------------------------------
+    # Level 1 固有の Planning 設定
+    # ------------------------------------------------------------------------
+
+    level1:
+      # planner_type: プランナーの種類
+      # - PlannerType.SGD: 勾配降下法ベースのプランナー（推奨）
+      # - PlannerType.CEM: Cross-Entropy Method
+      # - PlannerType.RandomShooting: ランダムシューティング
+      planner_type: PlannerType.SGD
+
+      # max_plan_length: プランの最大長
+      # - 10: 最大10ステップ先まで計画
+      # - 短いほど計算が速いが、複雑なタスクには不十分
+      max_plan_length: 10
+
+      # sgd: SGD プランナー固有の設定
+      sgd:
+        # lr: SGD の学習率
+        # - 0.3: アクション最適化の学習率
+        # - 大きいほど高速だが、不安定になる可能性
+        lr: 0.3
+
+        # n_iters: SGD の反復回数
+        # - デフォルト値（コードで定義）を使用
+        # - 明示的に設定する場合: 10-50
+        # n_iters: 20
+
+# ==============================================================================
+# 出力設定
+# ==============================================================================
+
+# output_dir: 出力ディレクトリ名
+# - チェックポイント、ログ、可視化結果の保存先
+# - output_root と組み合わせて完全なパスになる
+output_dir: minigrid_level1_test
+
+# output_root: 出力のルートディレクトリ
+# - 絶対パスまたはプロジェクトルートからの相対パス
+# - 例: /path/to/experiments, checkpoints/
+output_root: /Users/shunsei/works/MatsuoLab/WorldModel/PLDM/checkpoints
+
+# run_name: 実験の名前（WandB などで使用）
+# - WandB のダッシュボードに表示される名前
+# - null の場合、output_dir が使用される
+run_name: minigrid_level1_test
+
+# run_project: WandB のプロジェクト名
+# - WandB での実験グループ化に使用
+# - 例: "PLDM-MiniGrid", "MyProject"
+run_project: PLDM-MiniGrid
+
+# wandb: WandB ロギングを有効化するか
+# - false: ローカルログのみ（テスト時推奨）
+# - true: WandB に実験結果を送信（本番実験）
+wandb: false
+
+# ==============================================================================
+# その他
+# ==============================================================================
+
+# seed: ランダムシード
+# - 42: 全ての乱数生成器のシード
+# - 再現性のために固定値を使用
+# - 異なるシードで複数回実行して頑健性を確認することを推奨
+seed: 42
+
+# quick_debug: グローバルデバッグモード
+# - false: 通常モード
+# - true: データセットサイズ縮小、エポック数削減など
+# - 開発時の動作確認に使用
+quick_debug: false
+# ==============================================================================
+# 使用例
+# ==============================================================================
+
+# 1. 基本的な学習実行:
+#    python pldm/train.py --configs pldm/configs/minigrid/level1_annotated.yaml
+
+# 2. WandB を有効化して学習:
+#    python pldm/train.py --configs pldm/configs/minigrid/level1_annotated.yaml \
+#      --values wandb=True
+
+# 3. 学習率とエポック数を変更:
+#    python pldm/train.py --configs pldm/configs/minigrid/level1_annotated.yaml \
+#      --values base_lr=0.0005 epochs=100
+
+# 4. 訓練中に評価を実行:
+#    python pldm/train.py --configs pldm/configs/minigrid/level1_annotated.yaml \
+#      --values eval_during_training=True eval_every_n_epochs=10
+
+# 5. デバッグモードで高速確認:
+#    python pldm/train.py --configs pldm/configs/minigrid/level1_annotated.yaml \
+#      --values quick_debug=True
+
+# 6. 評価のみ実行（学習済みモデル）:
+#    python pldm/train.py --configs pldm/configs/minigrid/level1_annotated.yaml \
+#      --values eval_only=True load_checkpoint_path=checkpoints/model.ckpt
+
+# 7. バッチサイズとデータパスを変更:
+#    python pldm/train.py --configs pldm/configs/minigrid/level1_annotated.yaml \
+#      --values data.minigrid_config.batch_size=32 \
+#               data.minigrid_config.data_path=data/minigrid/level1_10k/train
+
+# 8. 複数の設定を同時に変更:
+#    python pldm/train.py --configs pldm/configs/minigrid/level1_annotated.yaml \
+#      --values wandb=True \
+#               epochs=100 \
+#               base_lr=0.001 \
+#               data.minigrid_config.batch_size=64 \
+#               eval_during_training=True
+
+# ==============================================================================
+# トラブルシューティング
+# ==============================================================================
+
+# Q1: メモリ不足エラーが出る
+# A: batch_size を小さくするか、img_size を小さくする
+#    --values data.minigrid_config.batch_size=8 data.minigrid_config.img_size=64
+
+# Q2: 学習が不安定（損失が発散）
+# A: 学習率を小さくする
+#    --values base_lr=0.0001
+
+# Q3: 学習が遅い
+# A: num_workers を増やす、compile_model=true を確認
+#    --values data.num_workers=4 compile_model=True
+
+# Q4: データが見つからない
+# A: data_path を確認、存在しない場合はデータ生成を実行
+#    python pldm_envs/minigrid/data_generation/generate_data.py ...
+
+# Q5: positions フィールドがないエラー
+# A: generate_data.py または generate_pldm_data.py を使ってデータを再生成
+
+# Q6: WandB にログインできない
+# A: wandb login を実行、または wandb=False で無効化
+#    --values wandb=False
+
+# ==============================================================================

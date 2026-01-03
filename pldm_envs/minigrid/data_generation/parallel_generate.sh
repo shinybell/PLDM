@@ -184,16 +184,17 @@ echo ""
 echo "Merging datasets..."
 
 # データセットを結合
+# データセットを結合
 python pldm_envs/minigrid/data_generation/merge_datasets.py \
     --input_pattern "$OUTPUT_DIR/worker_*.npz" \
-    --output_path "$OUTPUT_DIR/train.npz"
+    --output_path "$OUTPUT_DIR/train"
 
 if [ $? -eq 0 ]; then
     echo ""
     echo "========================================"
     echo "Success!"
     echo "========================================"
-    echo "Output file: $OUTPUT_DIR/train.npz"
+    echo "Output directory: $OUTPUT_DIR/train"
     echo ""
     # echo "Cleanup temporary worker files? (y/n)"
     # read -r CLEANUP
