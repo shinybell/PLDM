@@ -725,4 +725,4 @@ python pldm/planning/minigrid/run_mpc.py \
 ---
 
 **最終更新**: 2026-01-03
-**著者**: PLDM MiniGrid統合チーム
+**著者**: shinybell

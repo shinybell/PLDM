@@ -122,7 +122,7 @@ class MiniGridDataset(torch.utils.data.Dataset):
         if data_path.is_dir():
             # ディレクトリからロード (.npy files)
             print("Loading from directory (mmap_mode='r')")
-            
+
             def load_npy(filename):
                 return np.load(data_path / filename, mmap_mode='r')
 

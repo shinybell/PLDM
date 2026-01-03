@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  pldm:
+    build: .
+    container_name: pldm-dev
+    volumes:
+      - .:/workspace
+      - pldm-data:/workspace/pldm_envs/diverse_maze/data
+    working_dir: /workspace
+    environment:
+      - MUJOCO_GL=egl
+      - PYTHONUNBUFFERED=1
+    stdin_open: true
+    tty: true
+
+volumes:
+  pldm-data:

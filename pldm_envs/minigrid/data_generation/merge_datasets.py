@@ -100,7 +100,9 @@ def merge_datasets_memmap(input_files, output_path, is_dir=False):
             del data
             
         # 全てのデータをディスクに書き込み
+        print("\nFlushing data to disk...")
         for k in keys:
+            memmaps[k].flush()  # 明示的にディスクに書き込む（Google Drive対策）
             del memmaps[k]  # これでファイルが閉じられる
             
         # .npzの場合は圧縮して保存
