@@ -109,6 +109,15 @@ class TrainConfig(ConfigBase):
             self.eval_cfg.d4rl_planning.n_steps = 6
             self.eval_cfg.d4rl_planning.plot_every = 1
 
+            # MiniGrid stuff
+            self.data.minigrid_config.quick_debug = True
+            self.data.minigrid_config.crop_length = self.data.minigrid_config.batch_size
+            self.eval_cfg.minigrid_planning.n_envs = 5
+            self.eval_cfg.minigrid_planning.n_envs_batch_size = 2
+            self.eval_cfg.minigrid_planning.n_steps = 6
+            self.eval_cfg.minigrid_planning.plot_every = 1
+            self.eval_cfg.minigrid_planning.max_episode_steps = 50
+
         # Wall stuff
         self.eval_cfg.wall_planning.fix_wall = self.data.wall_config.fix_wall
         self.data.dot_config.n_steps = self.n_steps

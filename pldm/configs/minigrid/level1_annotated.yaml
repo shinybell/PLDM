@@ -541,16 +541,6 @@ eval_cfg:
   # - true: プランニングをスキップ（Probing のみ）
   disable_planning: false
 
-  # probe_preds: 予測器の出力を Probing するか
-  # - false: エンコーダのみ評価
-  # - true: 予測器も評価
-  probe_preds: false
-
-  # probe_encoder: エンコーダを Probing するか
-  # - false: Probing なし
-  # - true: 線形 Probe で表現を評価
-  probe_encoder: false
-
   # ------------------------------------------------------------------------
   # Probing 設定
   # ------------------------------------------------------------------------
