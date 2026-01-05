@@ -58,6 +58,9 @@ class DiscreteRNNPredictor(nn.Module):
         self.num_levels = num_levels
         self.rnn_hidden_dim = rnn_hidden_dim
 
+        # 既存のPredictorとの互換性のため
+        self.pred_propio_dim = 0  # DiscreteJEPAは固有受容状態を予測しない
+
         # Layer Normalization
         if hasattr(config, 'tie_backbone_ln') and config.tie_backbone_ln and backbone_ln is not None:
             self.final_ln = backbone_ln
