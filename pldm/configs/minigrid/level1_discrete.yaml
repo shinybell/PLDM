@@ -247,7 +247,7 @@ wandb: false
 seed: 42
 quick_debug: false
 resume_if_possible: true
-compile_model: true
+compile_model: false
 
 # ==============================================================================
 # 使用例
