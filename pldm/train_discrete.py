@@ -296,7 +296,7 @@ class DiscreteTrainer:
 
         # エポック終了時のメトリクス
         avg_metrics = metric_tracker.average()
-        Logger.run().log(avg_metrics, step=self.epoch)
+        Logger.run().log(avg_metrics)
 
         return avg_metrics
 
@@ -311,7 +311,7 @@ class DiscreteTrainer:
             print("\nRunning initial evaluation...")
             self.evaluator.epoch = -1
             eval_metrics = self.evaluator.evaluate()
-            Logger.run().log(eval_metrics, step=-1)
+            Logger.run().log(eval_metrics)
 
         # 訓練ループ
         for epoch in range(self.epoch, self.config.epochs):
@@ -342,7 +342,7 @@ class DiscreteTrainer:
                 self.evaluator.epoch = epoch
                 with torch.no_grad():
                     eval_metrics = self.evaluator.evaluate()
-                Logger.run().log(eval_metrics, step=epoch)
+                Logger.run().log(eval_metrics)
                 self.model.train()
 
         # 最終評価
@@ -354,7 +354,7 @@ class DiscreteTrainer:
             self.evaluator.epoch = self.config.epochs
             with torch.no_grad():
                 eval_metrics = self.evaluator.evaluate()
-            Logger.run().log(eval_metrics, step=self.config.epochs)
+            Logger.run().log(eval_metrics)
 
         Logger.run().finish()
         print("\n" + "="*70)
@@ -392,7 +392,7 @@ def main():
             trainer.evaluator.epoch = 0
             with torch.no_grad():
                 eval_metrics = trainer.evaluator.evaluate()
-            Logger.run().log(eval_metrics, step=0)
+            Logger.run().log(eval_metrics)
         Logger.run().finish()
     else:
         # 訓練
