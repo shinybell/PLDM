@@ -18,6 +18,18 @@ class DiscretePredictorOutput:
     indices: torch.Tensor  # (T, B, num_codebooks) - 予測インデックス
     hidden_states: Optional[torch.Tensor] = None  # RNNの隠れ状態
 
+    # 既存PredictorOutputとの互換性のため
+    obs_component: Optional[torch.Tensor] = None
+    propio_component: Optional[torch.Tensor] = None
+    prior_mus: Optional[torch.Tensor] = None
+    prior_vars: Optional[torch.Tensor] = None
+    prior_logits: Optional[torch.Tensor] = None
+    priors: Optional[torch.Tensor] = None
+    posterior_mus: Optional[torch.Tensor] = None
+    posterior_vars: Optional[torch.Tensor] = None
+    posterior_logits: Optional[torch.Tensor] = None
+    posteriors: Optional[torch.Tensor] = None
+
 
 class DiscreteRNNPredictor(nn.Module):
     """離散表現用RNN Predictor
