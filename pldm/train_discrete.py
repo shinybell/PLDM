@@ -134,11 +134,12 @@ class DiscreteTrainer:
         self.optimizer = optimizer_factory.create_optimizer()
 
         # スケジューラ
-        total_steps = len(self.ds) * config.epochs
         self.scheduler = Scheduler(
-            self.optimizer,
             schedule=config.optimizer_schedule,
-            total_steps=total_steps,
+            base_lr=config.base_lr,
+            data_loader=self.ds,
+            epochs=config.epochs,
+            optimizer=self.optimizer,
         )
 
         # チェックポイント読み込み
