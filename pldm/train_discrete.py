@@ -356,7 +356,6 @@ class DiscreteTrainer:
                 eval_metrics = self.evaluator.evaluate()
             Logger.run().log(eval_metrics)
 
-        Logger.run().finish()
         print("\n" + "="*70)
         print("Training complete!")
         print("="*70)
@@ -393,7 +392,6 @@ def main():
             with torch.no_grad():
                 eval_metrics = trainer.evaluator.evaluate()
             Logger.run().log(eval_metrics)
-        Logger.run().finish()
     else:
         # 訓練
         trainer.train()
