@@ -146,7 +146,7 @@ class DiscreteJEPA(nn.Module):
             z_continuous: (T, B, D) - 連続表現
         """
         # Backbone forward
-        if self.backbone.propio_dim is not None:
+        if hasattr(self.backbone, 'propio_dim') and self.backbone.propio_dim is not None:
             if propio_pos is not None and propio_pos.numel() > 0:
                 if propio_vel is not None and propio_vel.numel() > 0:
                     propio_states = torch.cat([propio_pos, propio_vel], dim=-1)
