@@ -216,10 +216,13 @@ class DiscreteTrainConfig(ConfigBase):
                 self.eval_cfg.minigrid_planning.n_steps = 10
                 self.eval_cfg.minigrid_planning.max_episode_steps = 50
 
-            # Probingも簡略化
+            # Probingも簡略化またはスキップ
             if hasattr(self.eval_cfg, 'probing'):
-                self.eval_cfg.probing.epochs = 3
-                self.eval_cfg.probing.sample_timesteps = 10
+                self.eval_cfg.probing.epochs = 1  # 最小限に
+                self.eval_cfg.probing.sample_timesteps = 5
+            # デバッグ時は評価自体を無効化
+            self.eval_cfg.eval_l1 = False
+            self.eval_cfg.disable_planning = True
 
         # val_n_stepsを同期
         self.val_n_steps = self.n_steps

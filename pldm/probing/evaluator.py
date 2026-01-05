@@ -325,6 +325,11 @@ class ProbingEvaluator:
 
                     pred_locs = torch.stack([prober(x) for x in pred_encs], dim=1)
 
+                    # Debug: print shapes
+                    print(f"[DEBUG] pred_encs.shape: {pred_encs.shape}")
+                    print(f"[DEBUG] pred_locs.shape: {pred_locs.shape}")
+                    print(f"[DEBUG] target.shape: {target.shape}")
+
                     losses = location_losses(pred_locs, target)
                     per_probe_loss = losses.mean()
 
