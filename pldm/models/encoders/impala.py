@@ -128,7 +128,7 @@ class ImpalaEncoder(SequenceBackbone):
         if self.layer_norm:
             conv_out = nn.LayerNorm(conv_out.size()[1:])(conv_out)
 
-        out = conv_out.view(conv_out.size(0), -1)
+        out = conv_out.contiguous().view(conv_out.size(0), -1)
         out = self.mlp(out)
         out = self.final_ln(out)
 
