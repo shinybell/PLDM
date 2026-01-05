@@ -126,11 +126,12 @@ class DiscreteTrainer:
         ).to(self.device)
 
         # オプティマイザ
-        self.optimizer = OptimizerFactory.create(
-            config.optimizer_type,
-            self.model.parameters(),
-            lr=config.base_lr,
+        optimizer_factory = OptimizerFactory(
+            model=self.model,
+            optimizer_type=config.optimizer_type,
+            base_lr=config.base_lr,
         )
+        self.optimizer = optimizer_factory.create_optimizer()
 
         # スケジューラ
         total_steps = len(self.ds) * config.epochs
