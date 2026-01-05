@@ -210,6 +210,12 @@ class DiscreteRNNPredictor(nn.Module):
         all_embeddings = []  # Probing用のre-embedded表現
 
         for t in range(T):
+            # デバッグ: 形状確認
+            if t == 0:
+                print(f"[DEBUG] current_state.shape: {current_state.shape}")
+                print(f"[DEBUG] actions.shape: {actions.shape}")
+                print(f"[DEBUG] actions[{t}].shape: {actions[t].shape}")
+
             # 1ステップ予測
             logits_t, indices_t, hidden = self.forward(
                 current_state, actions[t], hidden

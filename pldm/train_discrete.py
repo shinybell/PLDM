@@ -232,6 +232,19 @@ class DiscreteTrainer:
             observations = batch.states.to(self.device)  # (T, B, C, H, W)
             actions = batch.actions.to(self.device)  # (T-1, B, A)
 
+            # デバッグ: 最初のバッチで形状確認
+            if batch_idx == 0:
+                print(f"[DEBUG] observations.shape: {observations.shape}")
+                print(f"[DEBUG] actions.shape (before): {actions.shape}")
+
+            # MiniGridデータセットはactions.shape = (B, T-1, A)で返すので、
+            # (T-1, B, A)に転置する必要がある
+            if actions.ndim == 3 and actions.shape[0] != observations.shape[0] - 1:
+                actions = actions.transpose(0, 1)  # (B, T-1, A) -> (T-1, B, A)
+
+            if batch_idx == 0:
+                print(f"[DEBUG] actions.shape (after): {actions.shape}")
+
             # Propio（オプション）
             propio_pos = None
             propio_vel = None
