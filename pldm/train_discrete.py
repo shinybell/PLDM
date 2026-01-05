@@ -223,7 +223,7 @@ class DiscreteTrainer:
     def train_epoch(self, epoch: int):
         """1エポックの訓練"""
         self.model.train()
-        metric_tracker = MetricTracker()
+        metric_tracker = MetricTracker(window_size=100)
 
         pbar = tqdm(self.ds, desc=f"Epoch {epoch+1}/{self.config.epochs}")
 
