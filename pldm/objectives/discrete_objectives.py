@@ -115,7 +115,7 @@ class DiscretePredictionLoss(nn.Module):
                 total = mask_flat.sum()
             else:
                 correct = (pred_c == target_c).sum()
-                total = len(target_c)
+                total = torch.tensor(pred_c.numel(), dtype=torch.float32, device=pred_c.device)
 
             accuracy_c = correct.float() / (total.float() + 1e-8)
             accuracies_per_dim.append(accuracy_c.item())
