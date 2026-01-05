@@ -310,7 +310,7 @@ class DiscreteTrainer:
         if self.config.eval_at_beginning and self.evaluator is not None:
             print("\nRunning initial evaluation...")
             self.evaluator.epoch = -1
-            eval_metrics = self.evaluator.evaluate(self.model)
+            eval_metrics = self.evaluator.evaluate()
             Logger.run().log(eval_metrics, step=-1)
 
         # 訓練ループ
@@ -341,7 +341,7 @@ class DiscreteTrainer:
                 self.model.eval()
                 self.evaluator.epoch = epoch
                 with torch.no_grad():
-                    eval_metrics = self.evaluator.evaluate(self.model)
+                    eval_metrics = self.evaluator.evaluate()
                 Logger.run().log(eval_metrics, step=epoch)
                 self.model.train()
 
@@ -353,7 +353,7 @@ class DiscreteTrainer:
             self.model.eval()
             self.evaluator.epoch = self.config.epochs
             with torch.no_grad():
-                eval_metrics = self.evaluator.evaluate(self.model)
+                eval_metrics = self.evaluator.evaluate()
             Logger.run().log(eval_metrics, step=self.config.epochs)
 
         Logger.run().finish()
@@ -391,7 +391,7 @@ def main():
             trainer.model.eval()
             trainer.evaluator.epoch = 0
             with torch.no_grad():
-                eval_metrics = trainer.evaluator.evaluate(trainer.model)
+                eval_metrics = trainer.evaluator.evaluate()
             Logger.run().log(eval_metrics, step=0)
         Logger.run().finish()
     else:
