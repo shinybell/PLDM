@@ -207,6 +207,7 @@ class DiscreteRNNPredictor(nn.Module):
 
         all_logits = []
         all_indices = []
+        all_embeddings = []  # Probing用のre-embedded表現
 
         for t in range(T):
             # 1ステップ予測
@@ -235,19 +236,23 @@ class DiscreteRNNPredictor(nn.Module):
             # Re-embed（次のステップの入力）
             if fsq_embedding is not None:
                 current_state = fsq_embedding(next_indices)  # (B, repr_dim)
+                all_embeddings.append(current_state)
             else:
                 # fsq_embeddingがない場合はそのまま（デバッグ用）
                 # 実際の訓練では必須
                 current_state = current_state  # keep current
+                all_embeddings.append(current_state)
 
         # スタック
         predictions = torch.stack(all_logits, dim=0)  # (T, B, C, L)
         indices = torch.stack(all_indices, dim=0)  # (T, B, C)
+        embeddings = torch.stack(all_embeddings, dim=0) if all_embeddings else None  # (T, B, D)
 
         return DiscretePredictorOutput(
             predictions=predictions,
             indices=indices,
             hidden_states=hidden,
+            obs_component=embeddings,  # Probing用のre-embedded表現
         )
 
 
