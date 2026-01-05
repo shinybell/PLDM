@@ -273,7 +273,11 @@ class DiscreteTrainer:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
 
             self.optimizer.step()
-            self.scheduler.step()
+
+            # 学習率の更新
+            lr = self.scheduler.adjust_learning_rate(self.step)
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = lr
 
             # EMA更新
             if self.config.discrete_hjepa.level1.momentum > 0:
