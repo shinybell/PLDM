@@ -73,18 +73,16 @@ class FSQ(nn.Module):
 
         # 各次元の量子化境界を事前計算
         # levels[i] 個のレベルを [-1, 1] の範囲に均等配置
-        self.register_buffer('_boundaries', self._compute_boundaries())
+        # register_bufferはTensorのリストを直接扱えないので、個別に登録
+        for i, level in enumerate(self.levels):
+            bound = torch.linspace(-1, 1, level)
+            self.register_buffer(f'_boundary_{i}', bound)
+
         self.register_buffer('_levels_tensor', torch.tensor(levels))
 
-    def _compute_boundaries(self) -> List[torch.Tensor]:
-        """各次元の量子化境界を計算"""
-        boundaries = []
-        for level in self.levels:
-            # level個のレベルを [-1, 1] に配置
-            # 例: level=5 -> [-1, -0.5, 0, 0.5, 1]
-            bound = torch.linspace(-1, 1, level)
-            boundaries.append(bound)
-        return boundaries
+    def _get_boundary(self, dim_idx: int) -> torch.Tensor:
+        """指定次元の量子化境界を取得"""
+        return getattr(self, f'_boundary_{dim_idx}')
 
     def _quantize_per_dim(
         self,
@@ -101,7 +99,7 @@ class FSQ(nn.Module):
             quantized: (*, ) - 量子化後の値
             indices: (*, ) - インデックス (0 ~ levels[dim_idx]-1)
         """
-        boundaries = self._boundaries[dim_idx].to(z.device)
+        boundaries = self._get_boundary(dim_idx).to(z.device)
 
         # 最も近い境界を見つける
         # z: (B, T), boundaries: (L,) -> distances: (B, T, L)
