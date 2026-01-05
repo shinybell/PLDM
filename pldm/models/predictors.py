@@ -780,6 +780,20 @@ def build_predictor(
             action_dim=action_dim,
             z_dim=z_dim,
         )
+    elif arch == "discrete_rnn":
+        # DiscreteRNNPredictor用のインポート（遅延インポート）
+        from pldm.models.discrete_predictors import DiscreteRNNPredictor
+        predictor = DiscreteRNNPredictor(
+            config=config,
+            repr_dim=repr_dim,
+            action_dim=action_dim,
+            num_codebooks=config.fsq_num_codebooks if hasattr(config, 'fsq_num_codebooks') else 6,
+            num_levels=config.fsq_levels if hasattr(config, 'fsq_levels') else [8, 8, 8, 5, 5, 5],
+            rnn_hidden_dim=config.rnn_hidden_dim if hasattr(config, 'rnn_hidden_dim') else 512,
+            rnn_layers=rnn_layers,
+            predictor_ln=predictor_ln,
+            backbone_ln=backbone_ln,
+        )
     elif arch == "id":
         predictor = IDPredictor()
     else:

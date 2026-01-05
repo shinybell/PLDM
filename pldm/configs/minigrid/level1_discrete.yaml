@@ -1,0 +1,275 @@
+# ==============================================================================
+# MiniGrid Level1 DiscreteJEPA設定ファイル（FSQベース）
+# ==============================================================================
+#
+# FSQ (Finite Scalar Quantization)を用いて潜在表現を離散化し、
+# 離散空間でのロングホライズン予測を検証するための設定
+#
+# 使用方法:
+#   python pldm/train_discrete.py --configs pldm/configs/minigrid/level1_discrete.yaml
+#
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 基本設定
+# ------------------------------------------------------------------------------
+
+n_steps: &n_steps 16
+val_n_steps: *n_steps
+env_name: &env_name minigrid_level1
+
+# ==============================================================================
+# データ設定（既存と同じ）
+# ==============================================================================
+
+data:
+  dataset_type: DatasetType.MiniGrid
+  normalize: false
+  min_max_normalize_state: false
+  num_workers: 0
+  quick_debug: false
+
+  minigrid_config:
+    data_path: "data/minigrid/level1_train.npz"
+    val_path: "data/minigrid/level1_val.npz"
+    sample_length: *n_steps
+    img_size: 72
+    normalize_images: true
+    include_rewards: false
+    include_dones: false
+    batch_size: 16
+    crop_length: null
+    train: true
+    quick_debug: false
+
+# ==============================================================================
+# 訓練設定
+# ==============================================================================
+
+epochs: 50
+base_lr: 0.001
+optimizer_type: Adam
+optimizer_schedule: Cosine
+
+# ==============================================================================
+# DiscreteJEPA設定
+# ==============================================================================
+
+discrete_hjepa:
+  train_l1: true
+  freeze_l1: false
+  disable_l2: true
+  l1_n_steps: *n_steps
+  step_skip: 4
+
+  level1:
+    # ------------------------------------------------------------------------
+    # FSQ設定
+    # ------------------------------------------------------------------------
+    use_fsq: true
+
+    fsq:
+      # levels: 各次元の離散レベル数
+      # コードブックサイズ = 8^3 × 5^3 = 512 × 125 = 64,000
+      levels: [8, 8, 8, 5, 5, 5]
+      num_codebooks: 6
+      project_in: true  # 入力を射影してからFSQ適用
+      eps: 1.0e-5
+
+    # Re-embedding次元
+    reembed_dim: 512
+
+    # アクション次元
+    action_dim: 7
+    momentum: 0.0
+
+    # デュアル出力（デバッグ用）
+    dual_output: false
+
+    # ------------------------------------------------------------------------
+    # Backbone設定（既存と同じ）
+    # ------------------------------------------------------------------------
+    backbone:
+      arch: impala
+      backbone_subclass: i
+      backbone_mlp: null
+      backbone_norm: group_norm
+      backbone_pool: dim_reduce
+      backbone_final_fc: false
+      backbone_width_factor: 1
+      channels: 3
+      input_dim: null
+      final_ln: true
+
+    # ------------------------------------------------------------------------
+    # Discrete Predictor設定
+    # ------------------------------------------------------------------------
+    predictor:
+      predictor_arch: discrete_rnn
+      predictor_subclass: "512-512"
+
+      # RNN設定
+      rnn_layers: 1
+      rnn_hidden_dim: 512
+      rnn_state_dim: 512
+
+      # その他
+      residual: true
+      predictor_ln: true
+      tie_backbone_ln: true
+
+      # 離散予測設定
+      predict_per_codebook: true
+      use_gumbel_softmax: false
+      gumbel_temperature: 1.0
+
+      # Teacher forcing設定
+      teacher_forcing_ratio: 1.0  # 初期値
+      teacher_forcing_decay: 0.0  # エポックごとの減衰
+
+# ==============================================================================
+# 損失関数設定
+# ==============================================================================
+
+objectives_discrete:
+  objectives:
+    - VICReg
+    - DiscretePrediction
+
+  # VICReg（FSQ前の連続表現用）
+  vicreg:
+    projector: id
+    random_projector: false
+
+    # 空間次元の係数
+    sim_coeff: 1.0
+    std_coeff: 3.0
+    cov_coeff: 6.9238
+
+    # 時間次元の係数
+    std_coeff_t: 0.24535
+    cov_coeff_t: 0.0
+    sim_coeff_t: 0.74242
+
+    # その他
+    cov_per_feature: false
+    adjust_cov: true
+    cov_chunk_size: null
+    std_margin: 1.0
+    std_margin_t: 1.0
+
+  # 離散予測損失
+  discrete_prediction:
+    weight: 1.0  # VICRegとのバランス
+    per_dim_weight: false  # 各次元で均等に重み付け
+    label_smoothing: 0.0  # ラベル平滑化なし
+    dim_weights: null  # 各次元の重み（nullの場合は均等）
+
+# ==============================================================================
+# チェックポイント設定
+# ==============================================================================
+
+load_checkpoint_path: null
+load_l1_only: false
+
+# ==============================================================================
+# 評価設定
+# ==============================================================================
+
+eval_at_beginning: false
+eval_during_training: false
+eval_only: false
+train_only: false
+
+save_every_n_epochs: 5
+eval_every_n_epochs: 20
+
+eval_cfg:
+  env_name: *env_name
+  eval_l1: true
+  eval_l2: false
+  disable_planning: false
+
+  # Probing設定
+  probing:
+    l1_depth: 8
+    train_path: null
+    val_path: null
+    train_images_path: null
+    val_images_path: null
+    probe_wall: false
+    probe_border: false
+    probe_encoder: false
+    visualize_probing: true
+    probe_mpc: false
+    epochs: 20
+    epochs_enc: 30
+    full_finetune: false
+    lr: 0.0002
+    probe_targets: "locations"
+    locations:
+      arch: "512"
+      subclass: a
+    schedule: Constant
+    sample_timesteps: 30
+
+  # MiniGrid Planning (MPC) 設定
+  minigrid_planning:
+    n_envs: 4
+    n_steps: 200
+    visualize_planning: true
+    level: level1
+    seed: 42
+    error_threshold: 1.0
+    max_episode_steps: 1000
+    levels: "level1"
+
+    level1:
+      planner_type: PlannerType.SGD
+      max_plan_length: 10
+      sgd:
+        lr: 0.3
+
+# ==============================================================================
+# 出力設定
+# ==============================================================================
+
+output_dir: minigrid_level1_discrete
+output_root: /Users/shunsei/works/MatsuoLab/WorldModel/PLDM/checkpoints
+run_name: minigrid_level1_discrete
+run_project: PLDM-Discrete
+wandb: false
+
+# ==============================================================================
+# その他
+# ==============================================================================
+
+seed: 42
+quick_debug: false
+resume_if_possible: true
+compile_model: true
+
+# ==============================================================================
+# 使用例
+# ==============================================================================
+
+# 1. 基本的な学習実行:
+#    python pldm/train_discrete.py --configs pldm/configs/minigrid/level1_discrete.yaml
+
+# 2. WandB を有効化して学習:
+#    python pldm/train_discrete.py --configs pldm/configs/minigrid/level1_discrete.yaml \
+#      --values wandb=True
+
+# 3. FSQレベルを変更（より小さいコードブック）:
+#    python pldm/train_discrete.py --configs pldm/configs/minigrid/level1_discrete.yaml \
+#      --values discrete_hjepa.level1.fsq.levels=[8,8,8]
+
+# 4. Teacher forcing比率を調整:
+#    python pldm/train_discrete.py --configs pldm/configs/minigrid/level1_discrete.yaml \
+#      --values discrete_hjepa.level1.predictor.teacher_forcing_ratio=0.5
+
+# 5. デバッグモードで高速確認:
+#    python pldm/train_discrete.py --configs pldm/configs/minigrid/level1_discrete.yaml \
+#      --values quick_debug=True
+
+# ==============================================================================
