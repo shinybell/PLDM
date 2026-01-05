@@ -163,7 +163,18 @@ class DiscreteTrainer:
         # 評価器
         if not config.train_only:
             print("Building evaluator...")
-            self.evaluator = Evaluator(config.eval_cfg, self.model, self.device)
+            self.evaluator = Evaluator(
+                config=config.eval_cfg,
+                model=self.model,
+                quick_debug=config.quick_debug,
+                normalizer=self.ds.normalizer,
+                epoch=0,
+                probing_datasets=datasets.probing_datasets if hasattr(datasets, 'probing_datasets') else None,
+                l2_probing_datasets=datasets.l2_probing_datasets if hasattr(datasets, 'l2_probing_datasets') else None,
+                load_checkpoint_path=config.load_checkpoint_path or "",
+                output_path=config.output_path or "",
+                data_config=config.data,
+            )
         else:
             self.evaluator = None
 
@@ -298,6 +309,7 @@ class DiscreteTrainer:
         # 初期評価
         if self.config.eval_at_beginning and self.evaluator is not None:
             print("\nRunning initial evaluation...")
+            self.evaluator.epoch = -1
             eval_metrics = self.evaluator.evaluate(self.model)
             Logger.run().log(eval_metrics, step=-1)
 
@@ -327,6 +339,7 @@ class DiscreteTrainer:
             ):
                 print("\nRunning evaluation...")
                 self.model.eval()
+                self.evaluator.epoch = epoch
                 with torch.no_grad():
                     eval_metrics = self.evaluator.evaluate(self.model)
                 Logger.run().log(eval_metrics, step=epoch)
@@ -338,6 +351,7 @@ class DiscreteTrainer:
             print("Running final evaluation...")
             print("="*70)
             self.model.eval()
+            self.evaluator.epoch = self.config.epochs
             with torch.no_grad():
                 eval_metrics = self.evaluator.evaluate(self.model)
             Logger.run().log(eval_metrics, step=self.config.epochs)
@@ -375,6 +389,7 @@ def main():
         print("Running evaluation only...")
         if trainer.evaluator is not None:
             trainer.model.eval()
+            trainer.evaluator.epoch = 0
             with torch.no_grad():
                 eval_metrics = trainer.evaluator.evaluate(trainer.model)
             Logger.run().log(eval_metrics, step=0)
