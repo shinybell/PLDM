@@ -284,13 +284,11 @@ class DiscreteTrainer:
                 self.model.update_ema()
 
             # メトリクス記録
-            metrics = {
-                'train/loss': total_loss.item(),
-                'train/vicreg_loss': losses.get('vicreg_loss', torch.tensor(0.0)).item(),
-                'train/discrete_loss': losses.get('discrete_prediction_loss', torch.tensor(0.0)).item(),
-                'train/avg_accuracy': losses.get('avg_accuracy', 0.0),
-                'train/lr': self.optimizer.param_groups[0]['lr'],
-            }
+            metric_tracker.update('train/loss', total_loss.item())
+            metric_tracker.update('train/vicreg_loss', losses.get('vicreg_loss', torch.tensor(0.0)).item())
+            metric_tracker.update('train/discrete_loss', losses.get('discrete_prediction_loss', torch.tensor(0.0)).item())
+            metric_tracker.update('train/avg_accuracy', losses.get('avg_accuracy', 0.0))
+            metric_tracker.update('train/lr', self.optimizer.param_groups[0]['lr'])
 
             # コードブック利用率（定期的に）
             if batch_idx % 100 == 0 and forward_result.z_indices is not None:
@@ -298,9 +296,7 @@ class DiscreteTrainer:
                     forward_result.z_indices,
                     self.config.discrete_hjepa.level1.fsq.levels,
                 )
-                metrics['train/codebook_usage'] = codebook_stats['avg_usage']
-
-            metric_tracker.update(metrics)
+                metric_tracker.update('train/codebook_usage', codebook_stats['avg_usage'])
 
             # プログレスバー更新
             pbar.set_postfix({
@@ -312,7 +308,7 @@ class DiscreteTrainer:
             self.step += 1
 
         # エポック終了時のメトリクス
-        avg_metrics = metric_tracker.average()
+        avg_metrics = metric_tracker.build_log_dict()
         Logger.run().log(avg_metrics)
 
         return avg_metrics
